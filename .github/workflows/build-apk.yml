@@ -26,7 +26,9 @@ jobs:
               archive.extractall("source")
           PY
       - name: Przygotuj Android SDK
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        uses: android-actions/setup-android@v4
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0"
       - name: Zbuduj APK
         run: gradle -p source/KrupasMediaProbe assembleDebug --no-daemon --console=plain
       - name: Sprawdz podpis instalatora
