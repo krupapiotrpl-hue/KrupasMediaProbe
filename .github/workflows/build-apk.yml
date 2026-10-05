@@ -1,7 +1,7 @@
-name: Zbuduj instalator APK
+name: Zbuduj instalator APK BLE 0.2
 on:
   push:
-    branches: [main]
+    branches: [ble-0.2]
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,8 +25,66 @@ jobs:
           with zipfile.ZipFile("KRUPAS_Media_Probe_0.1_CLEAN.zip") as archive:
               archive.extractall("source")
           PY
-      - name: Przygotuj Android SDK
-        uses: android-actions/setup-android@v4
+      - name: Dodaj BLE
+        run: |
+          cp ble-patch/BleDisplayClient.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BleDisplayClient.java
+          cp ble-patch/AndroidManifest.xml source/KrupasMediaProbe/app/src/main/AndroidManifest.xml
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MainActivity.java")
+          s=p.read_text()
+          s=s.replace("import android.os.Looper;\n", "import android.os.Looper;\nimport android.os.Build;\nimport android.Manifest;\nimport android.content.pm.PackageManager;\n")
+          s=s.replace("    private boolean receiverRegistered;\n", "    private boolean receiverRegistered;\n    private BleDisplayClient bleDisplay;\n    private static final int REQ_BLE = 706;\n")
+          s=s.replace("        setContentView(buildUi());\n        registerLegacyReceiver();\n        handler.post(ticker);\n", "        setContentView(buildUi());\n        bleDisplay = new BleDisplayClient(this);\n        requestBlePermissionsAndStart();\n        registerLegacyReceiver();\n        handler.post(ticker);\n")
+          s=s.replace("        if (receiverRegistered) unregisterReceiver(legacyReceiver);\n        super.onDestroy();\n", "        if (receiverRegistered) unregisterReceiver(legacyReceiver);\n        if (bleDisplay != null) bleDisplay.stop();\n        super.onDestroy();\n")
+          s=s.replace("KRUPAS MEDIA PROBE 0.1 — K706", "KRUPAS MEDIA PROBE 0.2 BLE — K706")
+          old='''                if (!title.isEmpty() || !artist.isEmpty()) {
+                    MediaStateStore.save(this, "MEDIA_SESSION", c.getPackageName(), title, artist, album, state,
+                            "position=" + (p == null ? -1 : p.getPosition()));
+                }
+'''
+          new='''                if (!title.isEmpty() || !artist.isEmpty()) {
+                    MediaStateStore.save(this, "MEDIA_SESSION", c.getPackageName(), title, artist, album, state,
+                            "position=" + (p == null ? -1 : p.getPosition()));
+                }
+                if (!title.isEmpty() && p != null && p.getState() == PlaybackState.STATE_PLAYING && bleDisplay != null) {
+                    bleDisplay.sendText(title);
+                }
+'''
+          if old not in s:
+              raise SystemExit("Nie znaleziono bloku MediaSession")
+          s=s.replace(old,new)
+          marker="\n    private static String meta(MediaMetadata m, String key) {"
+          methods='''
+    private void requestBlePermissionsAndStart() {
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT}, REQ_BLE);
+                return;
+            }
+        } else if (Build.VERSION.SDK_INT >= 23) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_BLE);
+                return;
+            }
+        }
+        if (bleDisplay != null) bleDisplay.start();
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_BLE && bleDisplay != null) bleDisplay.start();
+    }
+'''
+          if marker not in s:
+              raise SystemExit("Nie znaleziono miejsca na metody BLE")
+          p.write_text(s.replace(marker, methods+marker))
+          g=Path("source/KrupasMediaProbe/app/build.gradle")
+          x=g.read_text().replace("versionCode 1\n        versionName '0.1'", "versionCode 2\n        versionName '0.2-BLE'")
+          g.write_text(x)
+          PY
+      - uses: android-actions/setup-android@v4
         with:
           packages: "platforms;android-35 build-tools;35.0.0"
       - name: Zbuduj APK
@@ -34,9 +92,9 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.1.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.2-BLE.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-APK
-          path: KRUPAS-Media-Probe-0.1.apk
+          name: KRUPAS-Media-Probe-0.2-BLE
+          path: KRUPAS-Media-Probe-0.2-BLE.apk
           if-no-files-found: error
