@@ -166,12 +166,28 @@ public class RdsAccessibilityService extends AccessibilityService {
     }
 
     private String sanitize(String text) {
+        if (text == null) return "";
+
         StringBuilder out = new StringBuilder();
+
         for (int i = 0; i < text.length() && out.length() < 96; i++) {
             char c = text.charAt(i);
-            if (c >= 32 && c <= 126) out.append(c);
-            else if (Character.isLetterOrDigit(c) || c == ' ') out.append(c);
+
+            if (c == '\n' || c == '\r' || c == '\t') {
+                c = ' ';
+            }
+
+            if (!Character.isISOControl(c)) {
+                out.append(c);
+            }
         }
-        return out.toString().trim();
+
+        String result = out.toString().trim();
+
+        while (result.contains("  ")) {
+            result = result.replace("  ", " ");
+        }
+
+        return result;
     }
 }
