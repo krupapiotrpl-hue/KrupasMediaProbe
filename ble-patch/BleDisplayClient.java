@@ -23,9 +23,16 @@ final class BleDisplayClient {
     private static final UUID SERVICE_UUID = UUID.fromString("6fbd0001-7c40-4a16-93c5-6c0c70696f74");
     private static final UUID RX_UUID = UUID.fromString("6fbd0002-7c40-4a16-93c5-6c0c70696f74");
 
-    private Context context;
+    private static BleDisplayClient INSTANCE;
+
+    static synchronized BleDisplayClient get(Context context) {
+        if (INSTANCE == null) INSTANCE = new BleDisplayClient(context.getApplicationContext());
+        return INSTANCE;
+    }
+
+    private final Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private BluetoothAdapter adapter;
+    private final BluetoothAdapter adapter;
 
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic rx;
@@ -33,8 +40,8 @@ final class BleDisplayClient {
     private String pending = "";
     private String lastSent = "";
 
-    BleDisplayClient(Context context) {
-        this.context = context.getApplicationContext();
+    private BleDisplayClient(Context context) {
+        this.context = context;
         BluetoothManager manager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         adapter = manager == null ? null : manager.getAdapter();
     }
@@ -60,6 +67,7 @@ final class BleDisplayClient {
         }
         gatt = null;
         rx = null;
+        lastSent = "";
     }
 
     void sendText(String text) {
@@ -139,7 +147,7 @@ final class BleDisplayClient {
     private static String clean(String text) {
         if (text == null) return "";
         StringBuilder out = new StringBuilder();
-        for (int i = 0; i < text.length() && out.length() < 12; i++) {
+        for (int i = 0; i < text.length() && out.length() < 96; i++) {
             char c = text.charAt(i);
             if (c >= 32 && c <= 126) out.append(c);
         }
