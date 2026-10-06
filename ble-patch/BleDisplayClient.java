@@ -23,9 +23,9 @@ final class BleDisplayClient {
     private static final UUID SERVICE_UUID = UUID.fromString("6fbd0001-7c40-4a16-93c5-6c0c70696f74");
     private static final UUID RX_UUID = UUID.fromString("6fbd0002-7c40-4a16-93c5-6c0c70696f74");
 
-    private final Context context;
+    private Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final BluetoothAdapter adapter;
+    private BluetoothAdapter adapter;
 
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic rx;
