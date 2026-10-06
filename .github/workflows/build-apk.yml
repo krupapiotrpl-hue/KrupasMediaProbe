@@ -1,4 +1,4 @@
-name: Zbuduj instalator APK BLE 0.2
+name: Zbuduj instalator APK RDS 0.3
 on:
   push:
     branches: [ble-0.2]
@@ -31,10 +31,11 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw BLE 0.2
+      - name: Wstaw RDS 0.3
         run: |
           cp ble-patch/BleDisplayClient.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BleDisplayClient.java
           cp ble-patch/MainActivity.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MainActivity.java
+          cp ble-patch/RdsAccessibilityService.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/RdsAccessibilityService.java
           cp ble-patch/AndroidManifest.xml source/KrupasMediaProbe/app/src/main/AndroidManifest.xml
           cp ble-patch/app-build.gradle source/KrupasMediaProbe/app/build.gradle
 
@@ -48,10 +49,10 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.2-BLE.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.3-RDS.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.2-BLE
-          path: KRUPAS-Media-Probe-0.2-BLE.apk
+          name: KRUPAS-Media-Probe-0.3-RDS
+          path: KRUPAS-Media-Probe-0.3-RDS.apk
           if-no-files-found: error
