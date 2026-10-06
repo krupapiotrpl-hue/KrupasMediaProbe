@@ -90,13 +90,23 @@ final class BleDisplayClient {
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
-                try { g.discoverServices(); } catch (Throwable ignored) {}
+                boolean mtuRequested = false;
+                if (Build.VERSION.SDK_INT >= 21) {
+                    try { mtuRequested = g.requestMtu(185); } catch (Throwable ignored) {}
+                }
+                if (!mtuRequested) {
+                    try { g.discoverServices(); } catch (Throwable ignored) {}
+                }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 rx = null;
                 try { g.close(); } catch (Throwable ignored) {}
                 if (gatt == g) gatt = null;
                 handler.postDelayed(BleDisplayClient.this::start, 2500);
             }
+        }
+
+        @Override public void onMtuChanged(BluetoothGatt g, int mtu, int status) {
+            try { g.discoverServices(); } catch (Throwable ignored) {}
         }
 
         @Override public void onServicesDiscovered(BluetoothGatt g, int status) {
@@ -146,11 +156,27 @@ final class BleDisplayClient {
 
     private static String clean(String text) {
         if (text == null) return "";
+
         StringBuilder out = new StringBuilder();
+
         for (int i = 0; i < text.length() && out.length() < 96; i++) {
             char c = text.charAt(i);
-            if (c >= 32 && c <= 126) out.append(c);
+
+            if (c == '\n' || c == '\r' || c == '\t') {
+                c = ' ';
+            }
+
+            if (!Character.isISOControl(c)) {
+                out.append(c);
+            }
         }
-        return out.toString().trim();
+
+        String result = out.toString().trim();
+
+        while (result.contains("  ")) {
+            result = result.replace("  ", " ");
+        }
+
+        return result;
     }
 }
