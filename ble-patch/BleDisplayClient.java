@@ -79,20 +79,6 @@ final class BleDisplayClient {
         scanning = false;
     }
 
-    private final BluetoothAdapter.LeScanCallback scanCallback = (device, rssi, scanRecord) -> {
-        if (device == null || !hasPermissions()) return;
-        String name = null;
-        try { name = device.getName(); } catch (Throwable ignored) {}
-        if (!DEVICE_NAME.equals(name)) return;
-        stopScan();
-        try {
-            gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
-        } catch (Throwable ex) {
-            gatt = null;
-            handler.postDelayed(this::start, 2500);
-        }
-    };
-
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
@@ -114,6 +100,20 @@ final class BleDisplayClient {
                 rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
                 writePending();
             }
+        }
+    };
+
+    private final BluetoothAdapter.LeScanCallback scanCallback = (device, rssi, scanRecord) -> {
+        if (device == null || !hasPermissions()) return;
+        String name = null;
+        try { name = device.getName(); } catch (Throwable ignored) {}
+        if (!DEVICE_NAME.equals(name)) return;
+        stopScan();
+        try {
+            gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
+        } catch (Throwable ex) {
+            gatt = null;
+            handler.postDelayed(this::start, 2500);
         }
     };
 
