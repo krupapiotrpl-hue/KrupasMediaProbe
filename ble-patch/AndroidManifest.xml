@@ -75,6 +75,10 @@
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
 
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/krupas_rds_accessibility" />
+
         </service>
 
         <service
