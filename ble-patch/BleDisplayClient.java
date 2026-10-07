@@ -35,7 +35,7 @@ final class BleDisplayClient {
         return INSTANCE;
     }
 
-    private final Context context;
+    private Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final BluetoothAdapter adapter;
 
