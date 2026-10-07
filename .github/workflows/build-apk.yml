@@ -1,4 +1,4 @@
-name: Zbuduj instalator APK RDS 0.4 PL
+name: Zbuduj instalator APK 0.5 AUTO
 on:
   push:
     branches: [ble-0.2]
@@ -11,6 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
     steps:
       - uses: actions/checkout@v4
 
@@ -31,11 +32,13 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw RDS 0.4 PL
+      - name: Wstaw KRUPAS MEDIA 0.5 AUTO
         run: |
           cp ble-patch/BleDisplayClient.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BleDisplayClient.java
           cp ble-patch/MainActivity.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MainActivity.java
           cp ble-patch/RdsAccessibilityService.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/RdsAccessibilityService.java
+          cp ble-patch/MediaBridgeService.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MediaBridgeService.java
+          cp ble-patch/BootReceiver.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BootReceiver.java
           cp ble-patch/AndroidManifest.xml source/KrupasMediaProbe/app/src/main/AndroidManifest.xml
           cp ble-patch/app-build.gradle source/KrupasMediaProbe/app/build.gradle
 
@@ -49,10 +52,10 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.4-RDS-PL.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.5-AUTO.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.4-RDS-PL
-          path: KRUPAS-Media-Probe-0.4-RDS-PL.apk
+          name: KRUPAS-Media-Probe-0.5-AUTO
+          path: KRUPAS-Media-Probe-0.5-AUTO.apk
           if-no-files-found: error
