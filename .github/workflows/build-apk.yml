@@ -1,4 +1,4 @@
-name: Zbuduj instalator APK 0.5 AUTO
+name: Zbuduj instalator APK 0.6 AUTO
 on:
   push:
     branches: [ble-0.2]
@@ -32,7 +32,7 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw KRUPAS MEDIA 0.5 AUTO
+      - name: Wstaw KRUPAS MEDIA 0.6 AUTO
         run: |
           cp ble-patch/BleDisplayClient.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BleDisplayClient.java
           cp ble-patch/MainActivity.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MainActivity.java
@@ -54,10 +54,10 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.5-AUTO.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6-AUTO.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.5-AUTO
-          path: KRUPAS-Media-Probe-0.5-AUTO.apk
+          name: KRUPAS-Media-Probe-0.6-AUTO
+          path: KRUPAS-Media-Probe-0.6-AUTO.apk
           if-no-files-found: error
