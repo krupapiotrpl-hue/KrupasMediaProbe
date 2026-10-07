@@ -14,6 +14,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -23,6 +24,10 @@ final class BleDisplayClient {
     private static final UUID SERVICE_UUID = UUID.fromString("6fbd0001-7c40-4a16-93c5-6c0c70696f74");
     private static final UUID RX_UUID = UUID.fromString("6fbd0002-7c40-4a16-93c5-6c0c70696f74");
 
+    private static final long SCAN_TIMEOUT_MS = 8000;
+    private static final long CONNECT_TIMEOUT_MS = 12000;
+    private static final long RETRY_MS = 1500;
+
     private static BleDisplayClient INSTANCE;
 
     static synchronized BleDisplayClient get(Context context) {
@@ -30,7 +35,7 @@ final class BleDisplayClient {
         return INSTANCE;
     }
 
-    private Context context;
+    private final Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final BluetoothAdapter adapter;
 
@@ -38,12 +43,14 @@ final class BleDisplayClient {
     private BluetoothGattCharacteristic rx;
     private boolean scanning;
     private boolean connected;
+    private long gattStartedAt;
     private String pending = "";
     private String lastSent = "";
 
     private BleDisplayClient(Context context) {
         this.context = context;
-        BluetoothManager manager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+        BluetoothManager manager =
+                (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         adapter = manager == null ? null : manager.getAdapter();
     }
 
@@ -56,29 +63,60 @@ final class BleDisplayClient {
     }
 
     void start() {
-        if (!hasPermissions() || adapter == null || !adapter.isEnabled() || scanning || gatt != null) return;
+        if (!hasPermissions() || adapter == null || !adapter.isEnabled()) return;
+
+        synchronized (this) {
+            if (isConnected() || scanning) return;
+
+            if (gatt != null) {
+                long age = gattStartedAt <= 0
+                        ? CONNECT_TIMEOUT_MS + 1
+                        : SystemClock.elapsedRealtime() - gattStartedAt;
+
+                if (age < CONNECT_TIMEOUT_MS) return;
+
+                closeCurrentGattLocked();
+            }
+        }
+
         try {
-            scanning = adapter.startLeScan(scanCallback);
+            // Kluczowa poprawka:
+            // szukamy po UUID uslugi, a nie tylko po nazwie urzadzenia.
+            // Na K706 device.getName() potrafi byc null do czasu,
+            // az inna aplikacja (np. nRF Connect) odswiezy cache BLE.
+            scanning = adapter.startLeScan(
+                    new UUID[]{SERVICE_UUID},
+                    scanCallback
+            );
+
             if (scanning) {
                 handler.postDelayed(() -> {
                     stopScan();
-                    if (gatt == null) handler.postDelayed(this::start, 2500);
-                }, 8000);
+
+                    synchronized (BleDisplayClient.this) {
+                        if (gatt == null && !connected) {
+                            handler.postDelayed(BleDisplayClient.this::start, RETRY_MS);
+                        }
+                    }
+                }, SCAN_TIMEOUT_MS);
+            } else {
+                handler.postDelayed(this::start, RETRY_MS);
             }
-        } catch (Throwable ignored) {}
+
+        } catch (Throwable ignored) {
+            scanning = false;
+            handler.postDelayed(this::start, RETRY_MS);
+        }
     }
 
     void stop() {
         handler.removeCallbacksAndMessages(null);
         stopScan();
-        if (gatt != null) {
-            try { gatt.disconnect(); } catch (Throwable ignored) {}
-            try { gatt.close(); } catch (Throwable ignored) {}
+
+        synchronized (this) {
+            closeCurrentGattLocked();
+            pending = "";
         }
-        gatt = null;
-        rx = null;
-        connected = false;
-        lastSent = "";
     }
 
     void sendText(String text) {
@@ -89,7 +127,7 @@ final class BleDisplayClient {
             pending = text;
         }
 
-        if (rx != null && gatt != null) {
+        if (isConnected()) {
             writePending();
         } else {
             start();
@@ -101,114 +139,217 @@ final class BleDisplayClient {
             scanning = false;
             return;
         }
-        try { adapter.stopLeScan(scanCallback); } catch (Throwable ignored) {}
+
+        try {
+            adapter.stopLeScan(scanCallback);
+        } catch (Throwable ignored) {}
+
         scanning = false;
     }
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
-        @Override public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
-            if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
-                connected = true;
-                lastSent = "";
-                boolean mtuRequested = false;
-                if (Build.VERSION.SDK_INT >= 21) {
-                    try { mtuRequested = g.requestMtu(185); } catch (Throwable ignored) {}
+        @Override public void onConnectionStateChange(
+                BluetoothGatt callbackGatt,
+                int status,
+                int newState
+        ) {
+            synchronized (BleDisplayClient.this) {
+                if (gatt != callbackGatt) {
+                    try { callbackGatt.close(); } catch (Throwable ignored) {}
+                    return;
                 }
-                if (!mtuRequested) {
-                    try { g.discoverServices(); } catch (Throwable ignored) {}
+
+                if (newState == BluetoothProfile.STATE_CONNECTED
+                        && status == BluetoothGatt.GATT_SUCCESS) {
+                    connected = true;
+                    gattStartedAt = 0;
+                    lastSent = "";
+                } else {
+                    connected = false;
+                    rx = null;
+                    lastSent = "";
+                    closeGattLocked(callbackGatt);
+                    handler.postDelayed(BleDisplayClient.this::start, RETRY_MS);
+                    return;
                 }
-            } else {
-                connected = false;
-                rx = null;
-                lastSent = "";
-                try { g.close(); } catch (Throwable ignored) {}
-                if (gatt == g) gatt = null;
-                handler.postDelayed(BleDisplayClient.this::start, 1500);
+            }
+
+            boolean mtuRequested = false;
+
+            if (Build.VERSION.SDK_INT >= 21) {
+                try {
+                    mtuRequested = callbackGatt.requestMtu(185);
+                } catch (Throwable ignored) {}
+            }
+
+            if (!mtuRequested) {
+                try {
+                    callbackGatt.discoverServices();
+                } catch (Throwable ignored) {
+                    reconnect(callbackGatt);
+                }
             }
         }
 
-        @Override public void onMtuChanged(BluetoothGatt g, int mtu, int status) {
-            try { g.discoverServices(); } catch (Throwable ignored) {}
+        @Override public void onMtuChanged(
+                BluetoothGatt callbackGatt,
+                int mtu,
+                int status
+        ) {
+            try {
+                callbackGatt.discoverServices();
+            } catch (Throwable ignored) {
+                reconnect(callbackGatt);
+            }
         }
 
-        @Override public void onServicesDiscovered(BluetoothGatt g, int status) {
+        @Override public void onServicesDiscovered(
+                BluetoothGatt callbackGatt,
+                int status
+        ) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                reconnect(g);
+                reconnect(callbackGatt);
                 return;
             }
 
-            BluetoothGattService service = g.getService(SERVICE_UUID);
+            BluetoothGattService service = callbackGatt.getService(SERVICE_UUID);
+
             if (service == null) {
-                reconnect(g);
+                reconnect(callbackGatt);
                 return;
             }
 
-            rx = service.getCharacteristic(RX_UUID);
-            if (rx == null) {
-                reconnect(g);
+            BluetoothGattCharacteristic characteristic =
+                    service.getCharacteristic(RX_UUID);
+
+            if (characteristic == null) {
+                reconnect(callbackGatt);
                 return;
             }
 
-            rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-            lastSent = "";
+            synchronized (BleDisplayClient.this) {
+                if (gatt != callbackGatt) return;
+                rx = characteristic;
+                rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                lastSent = "";
+            }
+
             writePending();
         }
     };
 
-    private void reconnect(BluetoothGatt g) {
-        connected = false;
-        rx = null;
-        lastSent = "";
-        try { g.disconnect(); } catch (Throwable ignored) {}
-        try { g.close(); } catch (Throwable ignored) {}
-        if (gatt == g) gatt = null;
-        handler.postDelayed(this::start, 1500);
+    private void reconnect(BluetoothGatt callbackGatt) {
+        synchronized (this) {
+            if (gatt == callbackGatt) {
+                closeGattLocked(callbackGatt);
+            } else {
+                try { callbackGatt.close(); } catch (Throwable ignored) {}
+            }
+        }
+
+        handler.postDelayed(this::start, RETRY_MS);
     }
 
-    private final BluetoothAdapter.LeScanCallback scanCallback = (device, rssi, scanRecord) -> {
-        if (device == null || !hasPermissions()) return;
+    private final BluetoothAdapter.LeScanCallback scanCallback =
+            (device, rssi, scanRecord) -> {
+                if (device == null || !hasPermissions()) return;
 
-        String name = null;
-        try { name = device.getName(); } catch (Throwable ignored) {}
-        if (!DEVICE_NAME.equals(name)) return;
+                stopScan();
 
-        stopScan();
+                synchronized (BleDisplayClient.this) {
+                    closeCurrentGattLocked();
 
-        try {
-            gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
-        } catch (Throwable ex) {
-            gatt = null;
-            connected = false;
-            handler.postDelayed(this::start, 1500);
-        }
-    };
+                    try {
+                        gattStartedAt = SystemClock.elapsedRealtime();
+                        gatt = device.connectGatt(
+                                context,
+                                false,
+                                gattCallback,
+                                BluetoothDevice.TRANSPORT_LE
+                        );
+
+                        if (gatt == null) {
+                            gattStartedAt = 0;
+                            handler.postDelayed(BleDisplayClient.this::start, RETRY_MS);
+                        }
+
+                    } catch (Throwable ignored) {
+                        gatt = null;
+                        gattStartedAt = 0;
+                        connected = false;
+                        handler.postDelayed(BleDisplayClient.this::start, RETRY_MS);
+                    }
+                }
+            };
 
     private void writePending() {
-        if (!hasPermissions() || gatt == null || rx == null) return;
-
+        final BluetoothGatt currentGatt;
+        final BluetoothGattCharacteristic currentRx;
         final String value;
+
         synchronized (this) {
+            currentGatt = gatt;
+            currentRx = rx;
             value = pending;
         }
 
+        if (!hasPermissions() || currentGatt == null || currentRx == null) return;
         if (value.isEmpty() || value.equals(lastSent)) return;
 
         try {
-            rx.setValue(value.getBytes(StandardCharsets.UTF_8));
-            if (gatt.writeCharacteristic(rx)) {
-                lastSent = value;
+            currentRx.setValue(value.getBytes(StandardCharsets.UTF_8));
+
+            if (currentGatt.writeCharacteristic(currentRx)) {
+                synchronized (this) {
+                    lastSent = value;
+                }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            reconnect(currentGatt);
+        }
+    }
+
+    private void closeCurrentGattLocked() {
+        BluetoothGatt current = gatt;
+
+        gatt = null;
+        rx = null;
+        connected = false;
+        gattStartedAt = 0;
+        lastSent = "";
+
+        if (current != null) {
+            try { current.disconnect(); } catch (Throwable ignored) {}
+            try { current.close(); } catch (Throwable ignored) {}
+        }
+    }
+
+    private void closeGattLocked(BluetoothGatt target) {
+        if (gatt == target) {
+            gatt = null;
+            rx = null;
+            connected = false;
+            gattStartedAt = 0;
+            lastSent = "";
+        }
+
+        try { target.disconnect(); } catch (Throwable ignored) {}
+        try { target.close(); } catch (Throwable ignored) {}
     }
 
     private boolean hasPermissions() {
         if (Build.VERSION.SDK_INT >= 31) {
-            return context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-                    && context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            return context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)
+                            == PackageManager.PERMISSION_GRANTED
+                    && context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                            == PackageManager.PERMISSION_GRANTED;
         }
+
         if (Build.VERSION.SDK_INT >= 23) {
-            return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            return context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED;
         }
+
         return true;
     }
 
@@ -220,9 +361,7 @@ final class BleDisplayClient {
         for (int i = 0; i < text.length() && out.length() < 96; i++) {
             char c = text.charAt(i);
 
-            if (c == '\n' || c == '\r' || c == '\t') {
-                c = ' ';
-            }
+            if (c == '\n' || c == '\r' || c == '\t') c = ' ';
 
             if (!Character.isISOControl(c)) {
                 out.append(c);
