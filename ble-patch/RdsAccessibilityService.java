@@ -46,9 +46,21 @@ public class RdsAccessibilityService extends AccessibilityService {
         Set<String> texts = new LinkedHashSet<>();
         collect(root, texts, 0);
 
-        String best = chooseBestCandidate(texts);
+        String best = chooseBestRadioCandidate(texts);
+
         if (!best.isEmpty() && !best.equals(lastSent)) {
             lastSent = best;
+            MediaStateStore.save(
+                    this,
+                    "RDS_ACCESSIBILITY",
+                    pkg,
+                    best,
+                    "",
+                    "",
+                    "VISIBLE",
+                    "filtered-radio-candidate"
+            );
+
             if (ble == null) ble = BleDisplayClient.get(this);
             ble.start();
             ble.sendText(best);
@@ -80,7 +92,7 @@ public class RdsAccessibilityService extends AccessibilityService {
         if (!s.isEmpty()) out.add(s);
     }
 
-    private String chooseBestCandidate(Set<String> texts) {
+    private String chooseBestRadioCandidate(Set<String> texts) {
         String best = "";
         int bestScore = Integer.MIN_VALUE;
 
@@ -89,32 +101,19 @@ public class RdsAccessibilityService extends AccessibilityService {
             if (s.length() < 3 || s.length() > 64) continue;
 
             String u = s.toUpperCase(Locale.ROOT);
+
             if (!containsLetter(s)) continue;
             if (looksLikeFrequency(u)) continue;
             if (isUiWord(u)) continue;
 
-            int score = 0;
+            int score = radioScore(u);
 
-            if (u.contains("RADIO")) score += 120;
-            if (u.contains("ZET")) score += 80;
-            if (u.contains("RMF")) score += 70;
-            if (u.contains("ESKA")) score += 70;
-            if (u.contains("VOX")) score += 60;
-            if (u.contains("TOK FM")) score += 70;
-            if (u.contains("ANTYRADIO")) score += 80;
+            // v0.5: nie wysylamy juz dowolnego tekstu z ekranu.
+            // Musi byc realny slad nazwy stacji/radia.
+            if (score < 60) continue;
 
-            if (s.length() >= 4 && s.length() <= 24) score += 30;
-            if (s.indexOf(' ') >= 0) score += 12;
-
-            int letters = 0;
-            int digits = 0;
-            for (int i = 0; i < s.length(); i++) {
-                char c = s.charAt(i);
-                if (Character.isLetter(c)) letters++;
-                if (Character.isDigit(c)) digits++;
-            }
-            score += letters;
-            score -= digits * 6;
+            if (s.length() >= 4 && s.length() <= 28) score += 20;
+            if (s.indexOf(' ') >= 0) score += 8;
 
             if (score > bestScore) {
                 bestScore = score;
@@ -122,7 +121,28 @@ public class RdsAccessibilityService extends AccessibilityService {
             }
         }
 
-        return bestScore >= 35 ? best : "";
+        return best;
+    }
+
+    private int radioScore(String u) {
+        int score = 0;
+
+        if (u.contains("RADIO")) score += 120;
+        if (u.contains("RMF")) score += 100;
+        if (u.contains("ZET")) score += 90;
+        if (u.contains("ESKA")) score += 90;
+        if (u.contains("VOX")) score += 80;
+        if (u.contains("TOK FM")) score += 100;
+        if (u.contains("ANTYRADIO")) score += 100;
+        if (u.contains("MELO")) score += 80;
+        if (u.contains("PLUS")) score += 65;
+        if (u.contains("CHILLI")) score += 80;
+        if (u.contains("MARYJA")) score += 80;
+        if (u.contains("357")) score += 65;
+        if (u.contains("NOWY SWIAT")) score += 80;
+        if (u.contains("NOWY ŚWIAT")) score += 80;
+
+        return score;
     }
 
     private boolean containsLetter(String s) {
@@ -155,7 +175,8 @@ public class RdsAccessibilityService extends AccessibilityService {
                 "FM", "AM", "RDS", "PTY", "TA", "AF", "ST", "STEREO",
                 "LOC", "DX", "SCAN", "BAND", "EQ", "HOME", "BACK",
                 "NEXT", "PREV", "PREVIOUS", "PLAY", "PAUSE", "SETTINGS",
-                "USTAWIENIA", "SEARCH", "SZUKAJ", "VOLUME", "GLOSNOSC"
+                "USTAWIENIA", "SEARCH", "SZUKAJ", "VOLUME", "GLOSNOSC",
+                "CENTRUM", "MENU", "SOURCE", "ZRODLO", "ŹRÓDŁO"
         };
 
         for (String b : blocked) {
