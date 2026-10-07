@@ -40,6 +40,8 @@ jobs:
           cp ble-patch/MediaBridgeService.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MediaBridgeService.java
           cp ble-patch/BootReceiver.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BootReceiver.java
           cp ble-patch/AndroidManifest.xml source/KrupasMediaProbe/app/src/main/AndroidManifest.xml
+          mkdir -p source/KrupasMediaProbe/app/src/main/res/xml
+          cp ble-patch/krupas_rds_accessibility.xml source/KrupasMediaProbe/app/src/main/res/xml/krupas_rds_accessibility.xml
           cp ble-patch/app-build.gradle source/KrupasMediaProbe/app/build.gradle
 
       - uses: android-actions/setup-android@v4
