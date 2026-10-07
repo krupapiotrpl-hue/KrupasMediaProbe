@@ -54,7 +54,7 @@ public class MainActivity extends Activity {
                     "action=" + intent.getAction() + "; extras=" + String.valueOf(e)
             );
 
-            // v0.5: MainActivity nie wysyla juz bezposrednio BLE.
+            // v0.6: MainActivity nie wysyla juz bezposrednio BLE.
             // Za wybor aktywnego zrodla odpowiada MediaBridgeService.
             refresh();
         }
@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         root.setPadding(24, 18, 24, 18);
 
         TextView title = new TextView(this);
-        title.setText("KRUPAS MEDIA PROBE 0.5 AUTO — K706");
+        title.setText("KRUPAS MEDIA PROBE 0.6 AUTO — K706");
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
