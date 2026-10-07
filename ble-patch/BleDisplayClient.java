@@ -30,13 +30,14 @@ final class BleDisplayClient {
         return INSTANCE;
     }
 
-    private Context context;
+    private final Context context;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final BluetoothAdapter adapter;
 
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic rx;
     private boolean scanning;
+    private boolean connected;
     private String pending = "";
     private String lastSent = "";
 
@@ -44,6 +45,14 @@ final class BleDisplayClient {
         this.context = context;
         BluetoothManager manager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         adapter = manager == null ? null : manager.getAdapter();
+    }
+
+    synchronized boolean isConnected() {
+        return connected && gatt != null && rx != null;
+    }
+
+    synchronized String getPendingText() {
+        return pending;
     }
 
     void start() {
@@ -63,19 +72,28 @@ final class BleDisplayClient {
         handler.removeCallbacksAndMessages(null);
         stopScan();
         if (gatt != null) {
+            try { gatt.disconnect(); } catch (Throwable ignored) {}
             try { gatt.close(); } catch (Throwable ignored) {}
         }
         gatt = null;
         rx = null;
+        connected = false;
         lastSent = "";
     }
 
     void sendText(String text) {
         text = clean(text);
         if (text.isEmpty()) return;
-        pending = text;
-        if (rx != null && gatt != null) writePending();
-        else start();
+
+        synchronized (this) {
+            pending = text;
+        }
+
+        if (rx != null && gatt != null) {
+            writePending();
+        } else {
+            start();
+        }
     }
 
     private void stopScan() {
@@ -90,6 +108,8 @@ final class BleDisplayClient {
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
+                connected = true;
+                lastSent = "";
                 boolean mtuRequested = false;
                 if (Build.VERSION.SDK_INT >= 21) {
                     try { mtuRequested = g.requestMtu(185); } catch (Throwable ignored) {}
@@ -97,11 +117,13 @@ final class BleDisplayClient {
                 if (!mtuRequested) {
                     try { g.discoverServices(); } catch (Throwable ignored) {}
                 }
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+            } else {
+                connected = false;
                 rx = null;
+                lastSent = "";
                 try { g.close(); } catch (Throwable ignored) {}
                 if (gatt == g) gatt = null;
-                handler.postDelayed(BleDisplayClient.this::start, 2500);
+                handler.postDelayed(BleDisplayClient.this::start, 1500);
             }
         }
 
@@ -110,36 +132,72 @@ final class BleDisplayClient {
         }
 
         @Override public void onServicesDiscovered(BluetoothGatt g, int status) {
-            if (status != BluetoothGatt.GATT_SUCCESS) return;
-            BluetoothGattService service = g.getService(SERVICE_UUID);
-            if (service == null) return;
-            rx = service.getCharacteristic(RX_UUID);
-            if (rx != null) {
-                rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-                writePending();
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                reconnect(g);
+                return;
             }
+
+            BluetoothGattService service = g.getService(SERVICE_UUID);
+            if (service == null) {
+                reconnect(g);
+                return;
+            }
+
+            rx = service.getCharacteristic(RX_UUID);
+            if (rx == null) {
+                reconnect(g);
+                return;
+            }
+
+            rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+            lastSent = "";
+            writePending();
         }
     };
 
+    private void reconnect(BluetoothGatt g) {
+        connected = false;
+        rx = null;
+        lastSent = "";
+        try { g.disconnect(); } catch (Throwable ignored) {}
+        try { g.close(); } catch (Throwable ignored) {}
+        if (gatt == g) gatt = null;
+        handler.postDelayed(this::start, 1500);
+    }
+
     private final BluetoothAdapter.LeScanCallback scanCallback = (device, rssi, scanRecord) -> {
         if (device == null || !hasPermissions()) return;
+
         String name = null;
         try { name = device.getName(); } catch (Throwable ignored) {}
         if (!DEVICE_NAME.equals(name)) return;
+
         stopScan();
+
         try {
             gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
         } catch (Throwable ex) {
             gatt = null;
-            handler.postDelayed(this::start, 2500);
+            connected = false;
+            handler.postDelayed(this::start, 1500);
         }
     };
 
     private void writePending() {
-        if (!hasPermissions() || gatt == null || rx == null || pending.isEmpty() || pending.equals(lastSent)) return;
+        if (!hasPermissions() || gatt == null || rx == null) return;
+
+        final String value;
+        synchronized (this) {
+            value = pending;
+        }
+
+        if (value.isEmpty() || value.equals(lastSent)) return;
+
         try {
-            rx.setValue(pending.getBytes(StandardCharsets.UTF_8));
-            if (gatt.writeCharacteristic(rx)) lastSent = pending;
+            rx.setValue(value.getBytes(StandardCharsets.UTF_8));
+            if (gatt.writeCharacteristic(rx)) {
+                lastSent = value;
+            }
         } catch (Throwable ignored) {}
     }
 
