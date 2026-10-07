@@ -15,41 +15,86 @@ public class RdsAccessibilityService extends AccessibilityService {
 
     @Override public void onServiceConnected() {
         super.onServiceConnected();
+
+        try {
+            AccessibilityServiceInfo info = getServiceInfo();
+
+            if (info == null) {
+                info = new AccessibilityServiceInfo();
+            }
+
+            info.eventTypes =
+                    AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED |
+                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED |
+                    AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED;
+
+            info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
+            info.notificationTimeout = 150;
+
+            info.flags |=
+                    AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS |
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS |
+                    AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
+
+            setServiceInfo(info);
+
+        } catch (Throwable ignored) {}
+
         ble = BleDisplayClient.get(this);
         ble.start();
 
-        AccessibilityServiceInfo info = new AccessibilityServiceInfo();
-        info.eventTypes =
-                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED |
-                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED |
-                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED;
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
-        info.notificationTimeout = 150;
-        info.flags =
-                AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS |
-                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS |
-                AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
-        setServiceInfo(info);
+        try {
+            MediaBridgeService.start(this);
+        } catch (Throwable ignored) {}
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
+        try {
+            handleAccessibilityEvent(event);
+        } catch (Throwable ignored) {
+            // Na niektorych ROM-ach K706 pojedynczy uszkodzony/recyklingowany
+            // AccessibilityNodeInfo potrafi rzucic wyjatek. Nie pozwalamy,
+            // aby taki przypadek zabil caly KRUPAS RDS Reader.
+            if (ble == null) ble = BleDisplayClient.get(this);
+            ble.start();
+        }
+    }
+
+    private void handleAccessibilityEvent(AccessibilityEvent event) {
         if (event == null) return;
 
         CharSequence pkgCs = event.getPackageName();
         String pkg = pkgCs == null ? "" : pkgCs.toString();
+
         if (pkg.equals(getPackageName())) return;
 
-        AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) root = event.getSource();
+        AccessibilityNodeInfo root = null;
+
+        try {
+            root = getRootInActiveWindow();
+        } catch (Throwable ignored) {}
+
+        if (root == null) {
+            try {
+                root = event.getSource();
+            } catch (Throwable ignored) {}
+        }
+
         if (root == null) return;
 
         Set<String> texts = new LinkedHashSet<>();
-        collect(root, texts, 0);
+
+        try {
+            collect(root, texts, 0);
+        } catch (Throwable ignored) {
+            return;
+        }
 
         String best = chooseBestRadioCandidate(texts);
 
         if (!best.isEmpty() && !best.equals(lastSent)) {
             lastSent = best;
+
             MediaStateStore.save(
                     this,
                     "RDS_ACCESSIBILITY",
@@ -62,33 +107,75 @@ public class RdsAccessibilityService extends AccessibilityService {
             );
 
             if (ble == null) ble = BleDisplayClient.get(this);
+
             ble.start();
             ble.sendText(best);
         }
     }
 
-    @Override public void onInterrupt() {}
+    @Override public void onInterrupt() {
+        if (ble == null) ble = BleDisplayClient.get(this);
+        ble.start();
+    }
 
-    private void collect(AccessibilityNodeInfo node, Set<String> out, int depth) {
+    private void collect(
+            AccessibilityNodeInfo node,
+            Set<String> out,
+            int depth
+    ) {
         if (node == null || depth > 20 || out.size() > 120) return;
 
-        addText(out, node.getText());
-        addText(out, node.getContentDescription());
+        try {
+            addText(out, node.getText());
+        } catch (Throwable ignored) {}
 
-        int count = node.getChildCount();
+        try {
+            addText(out, node.getContentDescription());
+        } catch (Throwable ignored) {}
+
+        int count;
+
+        try {
+            count = node.getChildCount();
+        } catch (Throwable ignored) {
+            return;
+        }
+
         for (int i = 0; i < count; i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                collect(child, out, depth + 1);
-                try { child.recycle(); } catch (Throwable ignored) {}
+            AccessibilityNodeInfo child = null;
+
+            try {
+                child = node.getChild(i);
+
+                if (child != null) {
+                    collect(child, out, depth + 1);
+                }
+
+            } catch (Throwable ignored) {
+                // Pojedynczy zly wezel nie moze ubic calej uslugi.
+
+            } finally {
+                if (child != null) {
+                    try {
+                        child.recycle();
+                    } catch (Throwable ignored) {}
+                }
             }
         }
     }
 
     private void addText(Set<String> out, CharSequence value) {
         if (value == null) return;
-        String s = value.toString().replace('\n', ' ').replace('\r', ' ').trim();
-        while (s.contains("  ")) s = s.replace("  ", " ");
+
+        String s = value.toString()
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .trim();
+
+        while (s.contains("  ")) {
+            s = s.replace("  ", " ");
+        }
+
         if (!s.isEmpty()) out.add(s);
     }
 
@@ -98,6 +185,7 @@ public class RdsAccessibilityService extends AccessibilityService {
 
         for (String raw : texts) {
             String s = sanitize(raw);
+
             if (s.length() < 3 || s.length() > 64) continue;
 
             String u = s.toUpperCase(Locale.ROOT);
@@ -108,8 +196,6 @@ public class RdsAccessibilityService extends AccessibilityService {
 
             int score = radioScore(u);
 
-            // v0.5: nie wysylamy juz dowolnego tekstu z ekranu.
-            // Musi byc realny slad nazwy stacji/radia.
             if (score < 60) continue;
 
             if (s.length() >= 4 && s.length() <= 28) score += 20;
@@ -149,6 +235,7 @@ public class RdsAccessibilityService extends AccessibilityService {
         for (int i = 0; i < s.length(); i++) {
             if (Character.isLetter(s.charAt(i))) return true;
         }
+
         return false;
     }
 
@@ -194,9 +281,7 @@ public class RdsAccessibilityService extends AccessibilityService {
         for (int i = 0; i < text.length() && out.length() < 96; i++) {
             char c = text.charAt(i);
 
-            if (c == '\n' || c == '\r' || c == '\t') {
-                c = ' ';
-            }
+            if (c == '\n' || c == '\r' || c == '\t') c = ' ';
 
             if (!Character.isISOControl(c)) {
                 out.append(c);
