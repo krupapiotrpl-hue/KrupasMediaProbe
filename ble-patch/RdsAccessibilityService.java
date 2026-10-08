@@ -204,10 +204,10 @@ public class RdsAccessibilityService extends AccessibilityService {
                     || u.equals("USB") || u.equals("LOCAL MUSIC")
                     || u.equals("UNKNOWN") || u.equals("ALBUM")
                     || u.equals("ARTIST") || u.equals("TITLE")) continue;
-            if (s.matches("(?i).*\\\\b[0-9]{1,2}:[0-9]{2}\\\\b.*")) continue;
+            if (s.matches(".*[0-9]{1,2}:[0-9]{2}.*")) continue;
             int score = s.length();
             if (s.indexOf(' ') >= 0) score += 20;
-            if (s.matches("(?i).*\\\\.(mp3|flac|wav|m4a)$")) score += 25;
+            if (u.endsWith(".MP3") || u.endsWith(".FLAC") || u.endsWith(".WAV") || u.endsWith(".M4A")) score += 25;
             if (score > bestScore) { bestScore = score; best = s; }
         }
         return best;
