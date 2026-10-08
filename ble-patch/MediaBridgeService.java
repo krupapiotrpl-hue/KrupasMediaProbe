@@ -109,6 +109,20 @@ public class MediaBridgeService extends Service {
             return;
         }
 
+        // Factory QF player may have a playing session with empty metadata.
+        // Do not let an old NavRadio title override its Accessibility title.
+        for (MediaController controller : sessions) {
+            if (controller == null || !"com.qf.musicplayer".equals(controller.getPackageName())) continue;
+            PlaybackState qf = controller.getPlaybackState();
+            if (qf != null && qf.getState() == PlaybackState.STATE_PLAYING) {
+                MediaMetadata md = controller.getMetadata();
+                if (meta(md, MediaMetadata.METADATA_KEY_TITLE).isEmpty()) {
+                    updateNotification("MP3 — odczyt tytułu z ekranu");
+                    return;
+                }
+            }
+        }
+
         MediaController best = null;
         MediaMetadata bestMetadata = null;
         PlaybackState bestState = null;
