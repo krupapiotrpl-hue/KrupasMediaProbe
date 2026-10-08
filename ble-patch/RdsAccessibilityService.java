@@ -90,7 +90,20 @@ public class RdsAccessibilityService extends AccessibilityService {
             return;
         }
 
-        String best = chooseBestRadioCandidate(texts);
+        // Only trust the foreground window from known media applications.
+        String activePkg = pkg;
+        try {
+            AccessibilityNodeInfo active = getRootInActiveWindow();
+            if (active != null && active.getPackageName() != null)
+                activePkg = active.getPackageName().toString();
+        } catch (Throwable ignored) {}
+        if (!pkg.equals(activePkg)) return;
+
+        boolean mp3 = "com.qf.musicplayer".equals(pkg);
+        boolean radio = "com.navimods.radio".equals(pkg);
+        if (!mp3 && !radio) return;
+
+        String best = mp3 ? chooseMp3Title(texts) : chooseBestRadioCandidate(texts);
 
         if (!best.isEmpty() && !best.equals(lastSent)) {
             lastSent = best;
@@ -179,6 +192,27 @@ public class RdsAccessibilityService extends AccessibilityService {
         if (!s.isEmpty()) out.add(s);
     }
 
+    private String chooseMp3Title(Set<String> texts) {
+        String best = "";
+        int bestScore = Integer.MIN_VALUE;
+        for (String raw : texts) {
+            String s = sanitize(raw);
+            String u = s.toUpperCase(Locale.ROOT);
+            if (s.length() < 4 || s.length() > 96 || !containsLetter(s)) continue;
+            if (looksLikeFrequency(u) || isUiWord(u)) continue;
+            if (u.equals("RADIO") || u.equals("MUSIC") || u.equals("MP3")
+                    || u.equals("USB") || u.equals("LOCAL MUSIC")
+                    || u.equals("UNKNOWN") || u.equals("ALBUM")
+                    || u.equals("ARTIST") || u.equals("TITLE")) continue;
+            if (s.matches("(?i).*\\\\b[0-9]{1,2}:[0-9]{2}\\\\b.*")) continue;
+            int score = s.length();
+            if (s.indexOf(' ') >= 0) score += 20;
+            if (s.matches("(?i).*\\\\.(mp3|flac|wav|m4a)$")) score += 25;
+            if (score > bestScore) { bestScore = score; best = s; }
+        }
+        return best;
+    }
+
     private String chooseBestRadioCandidate(Set<String> texts) {
         String best = "";
         int bestScore = Integer.MIN_VALUE;
@@ -186,7 +220,7 @@ public class RdsAccessibilityService extends AccessibilityService {
         for (String raw : texts) {
             String s = sanitize(raw);
 
-            if (s.length() < 3 || s.length() > 64) continue;
+            if (s.length() < 3 || s.length() > 64 || s.equalsIgnoreCase("Radio")) continue;
 
             String u = s.toUpperCase(Locale.ROOT);
 
