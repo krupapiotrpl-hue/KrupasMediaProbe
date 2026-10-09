@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
@@ -100,6 +101,21 @@ public class MediaBridgeService extends Service {
             return;
         }
 
+        // Foreground UI is authoritative over stale background MediaSessions.
+        // Do not replay NavRadio metadata while the factory MP3/FM app is open.
+        android.content.SharedPreferences source =
+                getSharedPreferences("krupas_source", Context.MODE_PRIVATE);
+        String foreground = source.getString("foreground_package", "");
+        long seen = source.getLong("foreground_at", 0);
+        boolean recentForeground = seen > 0
+                && SystemClock.elapsedRealtime() - seen < 15000;
+        if (recentForeground && !foreground.isEmpty()
+                && !foreground.equals(getPackageName())
+                && !"com.navimods.radio".equals(foreground)) {
+            updateNotification("Źródło: " + foreground + " — odczyt z ekranu");
+            return;
+        }
+
         if (sessions == null || sessions.isEmpty()) {
             updateNotification(
                     ble != null && ble.isConnected()
@@ -136,6 +152,9 @@ public class MediaBridgeService extends Service {
 
             String title = meta(metadata, MediaMetadata.METADATA_KEY_TITLE);
             if (title.isEmpty()) continue;
+            // Never promote paused/stopped sessions over the current source.
+            if (state == null || (state.getState() != PlaybackState.STATE_PLAYING
+                    && state.getState() != PlaybackState.STATE_BUFFERING)) continue;
 
             long score = score(state);
 
