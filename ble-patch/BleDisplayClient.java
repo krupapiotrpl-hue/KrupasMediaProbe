@@ -46,6 +46,20 @@ final class BleDisplayClient {
     private long gattStartedAt;
     private String pending = "";
     private String lastSent = "";
+    private boolean stopped;
+    private final Runnable watchdog = new Runnable() {
+        @Override public void run() {
+            synchronized (BleDisplayClient.this) {
+                if (stopped) return;
+                if (gatt != null && rx == null && gattStartedAt > 0
+                        && SystemClock.elapsedRealtime() - gattStartedAt >= CONNECT_TIMEOUT_MS) {
+                    closeCurrentGattLocked();
+                }
+            }
+            start();
+            handler.postDelayed(this, 3000);
+        }
+    };
 
     private BleDisplayClient(Context context) {
         this.context = context;
@@ -63,6 +77,9 @@ final class BleDisplayClient {
     }
 
     void start() {
+        stopped = false;
+        handler.removeCallbacks(watchdog);
+        handler.postDelayed(watchdog, 3000);
         if (!hasPermissions() || adapter == null || !adapter.isEnabled()) return;
 
         synchronized (this) {
@@ -110,6 +127,7 @@ final class BleDisplayClient {
     }
 
     void stop() {
+        stopped = true;
         handler.removeCallbacksAndMessages(null);
         stopScan();
 
@@ -162,7 +180,7 @@ final class BleDisplayClient {
                 if (newState == BluetoothProfile.STATE_CONNECTED
                         && status == BluetoothGatt.GATT_SUCCESS) {
                     connected = true;
-                    gattStartedAt = 0;
+                    // Keep start timestamp until service/characteristic discovery completes.
                     lastSent = "";
                 } else {
                     connected = false;
@@ -230,6 +248,7 @@ final class BleDisplayClient {
             synchronized (BleDisplayClient.this) {
                 if (gatt != callbackGatt) return;
                 rx = characteristic;
+                gattStartedAt = 0;
                 rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
                 lastSent = "";
             }
