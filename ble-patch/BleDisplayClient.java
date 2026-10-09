@@ -47,6 +47,7 @@ final class BleDisplayClient {
     private String pending = "";
     private String lastSent = "";
     private boolean stopped;
+    private boolean watchdogScheduled;
     private final Runnable watchdog = new Runnable() {
         @Override public void run() {
             synchronized (BleDisplayClient.this) {
@@ -78,8 +79,10 @@ final class BleDisplayClient {
 
     void start() {
         stopped = false;
-        handler.removeCallbacks(watchdog);
-        handler.postDelayed(watchdog, 3000);
+        if (!watchdogScheduled) {
+            watchdogScheduled = true;
+            handler.postDelayed(watchdog, 3000);
+        }
         if (!hasPermissions() || adapter == null || !adapter.isEnabled()) return;
 
         synchronized (this) {
@@ -128,6 +131,7 @@ final class BleDisplayClient {
 
     void stop() {
         stopped = true;
+        watchdogScheduled = false;
         handler.removeCallbacksAndMessages(null);
         stopScan();
 
