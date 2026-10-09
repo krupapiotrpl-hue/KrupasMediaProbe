@@ -100,14 +100,9 @@ final class BleDisplayClient {
         }
 
         try {
-            // Kluczowa poprawka:
-            // szukamy po UUID uslugi, a nie tylko po nazwie urzadzenia.
-            // Na K706 device.getName() potrafi byc null do czasu,
-            // az inna aplikacja (np. nRF Connect) odswiezy cache BLE.
-            scanning = adapter.startLeScan(
-                    new UUID[]{SERVICE_UUID},
-                    scanCallback
-            );
+            // K706: scan with service UUID filter can miss advertisements.
+            // Scan all BLE advertisements, then match advertised name or service UUID.
+            scanning = adapter.startLeScan(scanCallback);
 
             if (scanning) {
                 handler.postDelayed(() -> {
@@ -275,7 +270,11 @@ final class BleDisplayClient {
 
     private final BluetoothAdapter.LeScanCallback scanCallback =
             (device, rssi, scanRecord) -> {
-                if (device == null || !hasPermissions()) return;
+                if (device == null || !hasPermissions() || stopped) return;
+
+                String name = null;
+                try { name = device.getName(); } catch (SecurityException ignored) {}
+                if (!DEVICE_NAME.equals(name) && !advertisesService(scanRecord, SERVICE_UUID)) return;
 
                 stopScan();
 
@@ -304,6 +303,41 @@ final class BleDisplayClient {
                     }
                 }
             };
+
+    // Parse 16/32/128-bit service UUID advertising fields (128-bit little-endian).
+    private static boolean advertisesService(byte[] record, UUID uuid) {
+        if (record == null) return false;
+        byte[] target = new byte[16];
+        long lo = uuid.getLeastSignificantBits(), hi = uuid.getMostSignificantBits();
+        for (int i = 0; i < 8; i++) {
+            target[i] = (byte)(lo >>> (8 * i));
+            target[8 + i] = (byte)(hi >>> (8 * i));
+        }
+        int p = 0;
+        while (p < record.length) {
+            int length = record[p] & 0xff;
+            if (length == 0 || p + length >= record.length) break;
+            int type = record[p + 1] & 0xff;
+            if (type == 0x06 || type == 0x07) {
+                for (int i = p + 2; i + 15 <= p + length; i += 16) {
+                    boolean match = true;
+                    for (int j = 0; j < 16; j++) {
+                        if (record[i + j] != target[j]) { match = false; break; }
+                    }
+                    if (match) return true;
+                }
+            }
+            // Name in advertisement (works even when getName() is null).
+            if (type == 0x08 || type == 0x09) {
+                try {
+                    String advertised = new String(record, p + 2, length - 1, StandardCharsets.UTF_8);
+                    if (DEVICE_NAME.equals(advertised)) return true;
+                } catch (Throwable ignored) {}
+            }
+            p += length + 1;
+        }
+        return false;
+    }
 
     private void writePending() {
         final BluetoothGatt currentGatt;
