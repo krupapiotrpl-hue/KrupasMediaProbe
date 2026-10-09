@@ -199,7 +199,7 @@ public class RdsAccessibilityService extends AccessibilityService {
             String s = sanitize(raw);
             String u = s.toUpperCase(Locale.ROOT);
             if (s.length() < 4 || s.length() > 96 || !containsLetter(s)) continue;
-            if (looksLikeFrequency(u) || isUiWord(u)) continue;
+            if (looksLikeFrequency(u) || isUiWord(u) || isMp3ControlLabel(u)) continue;
             if (u.equals("RADIO") || u.equals("MUSIC") || u.equals("MP3")
                     || u.equals("USB") || u.equals("LOCAL MUSIC")
                     || u.equals("UNKNOWN") || u.equals("ALBUM")
@@ -211,6 +211,18 @@ public class RdsAccessibilityService extends AccessibilityService {
             if (score > bestScore) { bestScore = score; best = s; }
         }
         return best;
+    }
+
+    private boolean isMp3ControlLabel(String u) {
+        return u.contains("POPRZEDNIA PIOSENKA")
+                || u.contains("NASTĘPNA PIOSENKA")
+                || u.contains("NASTEPNA PIOSENKA")
+                || u.contains("POPRZEDNI UTWÓR")
+                || u.contains("POPRZEDNI UTWOR")
+                || u.contains("NASTĘPNY UTWÓR")
+                || u.contains("NASTEPNY UTWOR")
+                || u.equals("ODTWARZAJ") || u.equals("WSTRZYMAJ")
+                || u.equals("POWTARZAJ") || u.equals("LOSOWO");
     }
 
     private String chooseBestRadioCandidate(Set<String> texts) {
