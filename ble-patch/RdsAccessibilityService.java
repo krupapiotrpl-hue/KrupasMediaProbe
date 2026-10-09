@@ -1,6 +1,7 @@
 package pl.krupapiotr.mediaprobe;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.Context;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -100,8 +101,19 @@ public class RdsAccessibilityService extends AccessibilityService {
         if (!pkg.equals(activePkg)) return;
 
         boolean mp3 = "com.qf.musicplayer".equals(pkg);
-        boolean radio = "com.navimods.radio".equals(pkg);
-        if (!mp3 && !radio) return;
+        boolean navRadio = "com.navimods.radio".equals(pkg);
+        // Record the foreground source even when the factory radio's package
+        // is not yet known. This prevents a paused NavRadio title resurfacing.
+        getSharedPreferences("krupas_source", Context.MODE_PRIVATE).edit()
+                .putString("foreground_package", pkg)
+                .putLong("foreground_at", android.os.SystemClock.elapsedRealtime())
+                .apply();
+
+        // Factory radio: cautiously accept recognizable station names only.
+        boolean factoryRadio = !mp3 && !navRadio
+                && (pkg.toLowerCase(Locale.ROOT).contains("radio")
+                    || pkg.toLowerCase(Locale.ROOT).contains("fm"));
+        if (!mp3 && !navRadio && !factoryRadio) return;
 
         String best = mp3 ? chooseMp3Title(texts) : chooseBestRadioCandidate(texts);
 
@@ -116,7 +128,7 @@ public class RdsAccessibilityService extends AccessibilityService {
                     "",
                     "",
                     "VISIBLE",
-                    "filtered-radio-candidate"
+                    "foreground="+pkg
             );
 
             if (ble == null) ble = BleDisplayClient.get(this);
