@@ -22,6 +22,9 @@ public final class RadioAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
         List<String> strings = new ArrayList<>();
+        // OEM radio can publish RDS in an AccessibilityEvent only briefly.
+        if(event.getText()!=null) for(CharSequence text:event.getText()) if(text!=null)addUnique(strings,text.toString());
+        if(event.getContentDescription()!=null)addUnique(strings,event.getContentDescription().toString());
         ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
         q.add(root);
         int visited = 0;
@@ -43,10 +46,10 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(item.matches("^[0-9:./ -]+$"))continue;
                 title=item;break;
             }
-            getSharedPreferences("krupas_mp3_ui",MODE_PRIVATE).edit()
-                    .putString("pkg",pkg).putString("title",title)
-                    .putString("nodes",strings.toString())
-                    .putLong("seen",System.currentTimeMillis()).apply();
+            android.content.SharedPreferences.Editor state=getSharedPreferences("krupas_mp3_ui",MODE_PRIVATE).edit()
+                    .putString("pkg",pkg).putString("nodes",strings.toString());
+            if(!title.isEmpty())state.putString("title",title).putLong("seen",System.currentTimeMillis());
+            state.apply();
             return;
         }
         String freq = "", station = "";
@@ -64,10 +67,18 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 u.contains("ROCK") || u.contains("TOK") || u.contains("JEDYNKA") ||
                 u.contains("TRÓJKA")) {station=s; break;}
         }
-        getSharedPreferences("krupas_radio", MODE_PRIVATE).edit()
-                .putString("pkg",pkg).putString("freq",freq)
-                .putString("station",station).putLong("seen",System.currentTimeMillis())
-                .putString("nodes",strings.toString()).apply();
+        android.content.SharedPreferences pref=getSharedPreferences("krupas_radio", MODE_PRIVATE);
+        String previousFreq=pref.getString("freq","");
+        String previousStation=pref.getString("station","");
+        boolean tuned=!freq.isEmpty()&&!freq.equals(previousFreq);
+        // A transient missing RDS label must not erase the last valid station.
+        // A real frequency change, however, invalidates the old RDS label.
+        String resolvedStation=!station.isEmpty()?station:tuned?"":previousStation;
+        android.content.SharedPreferences.Editor record=pref.edit()
+                .putString("pkg",pkg).putString("station",resolvedStation)
+                .putString("nodes",strings.toString());
+        if(!freq.isEmpty())record.putString("freq",freq).putLong("seen",System.currentTimeMillis());
+        record.apply();
     }
     private static void addUnique(List<String> out,String s) {
         s=SourceRouter.clean(s);

@@ -97,6 +97,7 @@ public final class MediaBridgeService extends Service {
         MediaResult media=findPlayingMedia();
         if(media.title.isEmpty())media=fallbackLegacy(now);
         if(media.title.isEmpty())media=fallbackVisibleMp3(now,radioSeen);
+        if(media.title.isEmpty())media=fallbackNotification(now,radioSeen);
         diag("media_status",media.pkg+" / "+media.title+" / "+media.state);
         diag("radio_status",radioPkg+" / "+freq+" / "+station+" / age="+(now-radioSeen)+"ms");
         // FM may stay on in the background: preserve the last known station
@@ -168,6 +169,15 @@ public final class MediaBridgeService extends Service {
         if(stamp==0 || now-stamp>20000 || stamp<radioSeen)return m;
         m.title=SourceRouter.clean(p.getString("title",""));
         m.pkg=p.getString("pkg","mp3-ui");m.state="MP3 UI";
+        return m;
+    }
+    private MediaResult fallbackNotification(long now,long radioSeen){
+        MediaResult m=new MediaResult();
+        SharedPreferences p=getSharedPreferences("krupas_mp3_notification",0);
+        long t=p.getLong("seen",0);
+        if(t==0 || now-t>45000 || t<radioSeen)return m;
+        m.title=SourceRouter.clean(p.getString("title",""));
+        m.pkg=p.getString("pkg","notification");m.state="NOTIFICATION";
         return m;
     }
     private static class MediaResult {String title="",pkg="",state="NONE";}

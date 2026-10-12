@@ -16,6 +16,20 @@ public class MediaProbeNotificationService extends NotificationListenerService {
         String sub = text(e, Notification.EXTRA_SUB_TEXT);
         String info = text(e, Notification.EXTRA_INFO_TEXT);
 
+        // Music players on K706 do not always expose a MediaSession.
+        // Save audio notifications as a bounded metadata fallback.
+        String pkg=sbn.getPackageName();
+        if(pkg!=null && !pkg.equals(getPackageName()) && !SourceRouter.isRadioPackage(pkg)
+                && (SourceRouter.isAudioPackage(pkg) || Notification.CATEGORY_TRANSPORT.equals(n.category))) {
+            String candidate=SourceRouter.mediaDisplay(title,text);
+            String upper=title.toUpperCase(java.util.Locale.ROOT);
+            if(!candidate.isEmpty() && !upper.equals("MUSIC") && !upper.equals("MUZYKA")
+                    && !upper.equals("USB") && !upper.equals("MP3")) {
+                getSharedPreferences("krupas_mp3_notification",MODE_PRIVATE).edit()
+                        .putString("pkg",pkg).putString("title",candidate)
+                        .putLong("seen",System.currentTimeMillis()).apply();
+            }
+        }
         MediaStateStore.save(
                 this,
                 "NOTIFICATION",
@@ -26,6 +40,12 @@ public class MediaProbeNotificationService extends NotificationListenerService {
                 "posted",
                 "info=" + info + "; category=" + n.category
         );
+    }
+
+    @Override public void onNotificationRemoved(StatusBarNotification sbn) {
+        if(sbn==null)return;
+        android.content.SharedPreferences p=getSharedPreferences("krupas_mp3_notification",MODE_PRIVATE);
+        if(sbn.getPackageName().equals(p.getString("pkg","")))p.edit().remove("title").remove("seen").apply();
     }
 
     private static String text(Bundle b, String key) {
