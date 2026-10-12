@@ -185,7 +185,7 @@ final class BleDisplayClient {
     private void sendNext(){
         if(!ready||busy||queue.isEmpty()||gatt==null||write==null)return;
         try{
-            byte[] bytes=limitUtf8(queue.peekFirst(),Math.min(120,Math.max(20,negotiatedMtu-3)));
+            byte[] bytes=limitUtf8(queue.peekFirst(),Math.min(384,Math.max(20,negotiatedMtu-3)));
             busy=true;lastWrite=SystemClock.elapsedRealtime();
             boolean ok;
             if(Build.VERSION.SDK_INT>=33){
