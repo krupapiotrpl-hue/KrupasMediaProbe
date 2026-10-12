@@ -34,6 +34,7 @@ final class BleDisplayClient {
     private BluetoothGatt gatt;
     private BluetoothGattCharacteristic write;
     private boolean running, scanning, ready, busy;
+    private int writeType=BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
     private long startedConnect;
     private int negotiatedMtu=23;
     private boolean servicesRequested;
@@ -85,7 +86,13 @@ final class BleDisplayClient {
                 if(result.getScanRecord()!=null)n=result.getScanRecord().getDeviceName();
                 if((n==null||n.isEmpty())&&result.getDevice()!=null)n=result.getDevice().getName();
             }catch(SecurityException ignored){}
-            if(NAME.equalsIgnoreCase(n)){
+            boolean matchingService=false;
+            if(result.getScanRecord()!=null && result.getScanRecord().getServiceUuids()!=null) {
+                for(android.os.ParcelUuid id:result.getScanRecord().getServiceUuids()) {
+                    if(SERVICE.equals(id.getUuid())){matchingService=true;break;}
+                }
+            }
+            if(NAME.equalsIgnoreCase(n) || matchingService){
                 BluetoothDevice device=result.getDevice();
                 stopScan();
                 if(timeoutTask!=null)h.removeCallbacks(timeoutTask);
@@ -130,12 +137,21 @@ final class BleDisplayClient {
             BluetoothGattService s=source.getService(SERVICE);
             write=s==null?null:s.getCharacteristic(CHAR);
             if(write==null){fail("BRAK CHAR WRITE - SPRAWDŹ UUID ESP");return;}
+            int properties=write.getProperties();
+            if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)!=0)
+                writeType=BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
+            else if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE)!=0)
+                writeType=BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
+            else {fail("CHAR ESP NIE OBSŁUGUJE WRITE (PROP="+properties+")");return;}
             if(timeoutTask!=null)h.removeCallbacks(timeoutTask);
-            failures=0;ready=true;busy=false;queue.clear();
-            log("BLE OK ZAFIRA-DISPLAY"); notifyReady.run();
+            failures=0;ready=true;busy=false;
+            log("BLE OK ZAFIRA-DISPLAY / WRITE="+(writeType==1?"NO_RESPONSE":"DEFAULT"));
+            notifyReady.run();
+            sendNext();
         });}
         @Override public void onCharacteristicWrite(BluetoothGatt source,BluetoothGattCharacteristic ch,int status){h.post(()->{
-            if(source!=gatt)return;
+            if(source!=gatt || !ready)return;
+            if(writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)return; // locally paced
             busy=false;
             if(status==BluetoothGatt.GATT_SUCCESS){if(!queue.isEmpty())queue.pollFirst();sendNext();}
             else fail("BLE WRITE STATUS "+status);
@@ -151,9 +167,9 @@ final class BleDisplayClient {
     void send(String s){
         if(s==null || s.isEmpty())return;
         h.post(()->{
-            if(!ready)return;
             if(queue.size()>=20)queue.pollFirst();
-            queue.addLast(s);
+            queue.addLast(s); // retain messages while disconnected
+            if(!running)start();
             sendNext();
         });
     }
@@ -164,13 +180,22 @@ final class BleDisplayClient {
             busy=true;lastWrite=SystemClock.elapsedRealtime();
             boolean ok;
             if(Build.VERSION.SDK_INT>=33){
-                ok=gatt.writeCharacteristic(write,bytes,BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)==BluetoothGatt.GATT_SUCCESS;
+                ok=gatt.writeCharacteristic(write,bytes,writeType)==BluetoothGatt.GATT_SUCCESS;
             }else{
-                write.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                write.setWriteType(writeType);
                 write.setValue(bytes);
                 ok=gatt.writeCharacteristic(write);
             }
-            if(!ok){busy=false;fail("BLE WRITE FALSE");}
+            if(!ok){busy=false;fail("BLE WRITE FALSE");return;}
+            context.getSharedPreferences("krupas_diag",0).edit().putString("last_tx",queue.peekFirst()).apply();
+            if(writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE){
+                final BluetoothGatt sentOn=gatt;
+                h.postDelayed(()->{
+                    if(sentOn!=gatt || !ready || !busy)return;
+                    if(!queue.isEmpty())queue.pollFirst();
+                    busy=false;sendNext();
+                },200);
+            }
         }catch(Exception ex){busy=false;fail("BLE WRITE "+ex.getClass().getSimpleName());}
     }
     private static byte[] limitUtf8(String text,int limit){
@@ -196,7 +221,7 @@ final class BleDisplayClient {
     private void fail(String reason){log(reason);stopScan();cleanup();failures++;retry(Math.min(30000,2000*(1<<Math.min(4,failures-1))));}
     private void retry(int delay){ if(!running)return; if(retryTask!=null)h.removeCallbacks(retryTask);retryTask=this::attempt;h.postDelayed(retryTask,delay);}
     private void cleanup(){
-        ready=false;busy=false;write=null;queue.clear();
+        ready=false;busy=false;write=null; // retain unsent messages for next connection
         BluetoothGatt old=gatt;gatt=null;
         safeClose(old);
     }
