@@ -140,7 +140,7 @@ public final class MediaBridgeService extends Service {
                 oldFreq = "";
             }
 
-            if (!station.isEmpty() && (stationChanged || now - sentStation >= 10000)) {
+            if (!station.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
                 ble.send("RDS:" + station);
                 oldStation = station;
                 sentStation = now;
