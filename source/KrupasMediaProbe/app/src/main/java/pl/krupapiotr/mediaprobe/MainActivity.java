@@ -23,7 +23,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
-        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 0.9 • K706");
+        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.0 • K706");
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
         hint.setTextSize(14);root.addView(hint);

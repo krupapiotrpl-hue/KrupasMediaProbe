@@ -31,8 +31,7 @@ public final class MediaBridgeService extends Service {
     private BleDisplayClient ble;
     private boolean registered;
     private String oldMedia="",oldFreq="",oldStation="";
-    private long sentMedia, sentRadio;
-    private boolean radioKnown;
+    private long sentMedia, sentRadio, sentStation;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
         h.postDelayed(this,1500);
@@ -42,7 +41,7 @@ public final class MediaBridgeService extends Service {
         super.onCreate();
         foreground();
         ble=new BleDisplayClient(this,()->{
-            oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=0;
+            oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
@@ -84,54 +83,100 @@ public final class MediaBridgeService extends Service {
     }
     private void diag(String k,String v){getSharedPreferences("krupas_diag",0).edit().putString(k,v).apply();}
     private void refresh(){
-        if(ble==null)return;
+        if (ble == null) return;
         ble.watchdog();
-        final long now=System.currentTimeMillis();
-        final SharedPreferences radio=getSharedPreferences("krupas_radio",0);
-        String freq=SourceRouter.clean(radio.getString("freq",""));
-        String station=SourceRouter.clean(radio.getString("station",""));
-        long radioSeen=radio.getLong("seen",0);
-        String radioPkg=radio.getString("pkg", "");
-        boolean validRadio=now-radioSeen<15000 && !freq.isEmpty();
-        if(validRadio)radioKnown=true;
-        MediaResult media=findPlayingMedia();
-        if(media.title.isEmpty())media=fallbackLegacy(now);
-        if(media.title.isEmpty())media=fallbackVisibleMp3(now,radioSeen);
-        if(media.title.isEmpty())media=fallbackNotification(now,radioSeen);
-        diag("media_status",media.pkg+" / "+media.title+" / "+media.state);
-        diag("radio_status",radioPkg+" / "+freq+" / "+station+" / age="+(now-radioSeen)+"ms");
-        // FM may stay on in the background: preserve the last known station
-        // during this service session, but give actual playing MP3 precedence.
-        // A freshly visible OEM FM window beats stale MediaSession metadata.
-        // A newer visible MP3 player may still take over immediately.
-        long mp3Seen=getSharedPreferences("krupas_mp3_ui",0).getLong("seen",0);
-        boolean newerVisibleMp3=!media.title.isEmpty() && mp3Seen>radioSeen && now-mp3Seen<7000;
-        boolean preferRadio=(validRadio && !newerVisibleMp3) || (radioKnown && media.title.isEmpty());
-        if(preferRadio){
-            if(!oldMedia.isEmpty()){ble.send("MEDIA:STOP");oldMedia="";}
-            String effectiveFreq=!freq.isEmpty()?freq:oldFreq;
-            boolean frequencyChanged=!effectiveFreq.isEmpty()&&!effectiveFreq.equals(oldFreq);
-            if(ble.ready() && !effectiveFreq.isEmpty() && (!effectiveFreq.equals(oldFreq)||now-sentRadio>60000)){
-                ble.send("FM:FM "+effectiveFreq); oldFreq=effectiveFreq;sentRadio=now;
+        final long now = System.currentTimeMillis();
+        final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
+        final String freq = SourceRouter.clean(radio.getString("freq", ""));
+        final String station = SourceRouter.clean(radio.getString("station", ""));
+        final long radioSeen = radio.getLong("seen", 0);
+        final boolean radioVisible = radio.getBoolean("visible", false);
+        final boolean radioLive = radioVisible && radioSeen > 0 &&
+                now >= radioSeen && now - radioSeen <= 25000 &&
+                (!freq.isEmpty() || !station.isEmpty());
+
+        MediaResult media = findPlayingMedia();
+        if (media.title.isEmpty()) media = fallbackLegacy(now);
+        if (media.title.isEmpty()) media = fallbackVisibleMp3(now, radioSeen);
+        if (media.title.isEmpty()) media = fallbackNotification(now, radioSeen);
+
+        diag("media_status", media.pkg + " / " + media.title + " / " + media.state);
+        diag("radio_status", radio.getString("pkg", "") + " / " + freq +
+                " / " + station + " / age=" + (radioSeen == 0 ? -1 : now - radioSeen) +
+                "ms / visible=" + radioVisible);
+
+        // An actually PLAYING media session is more reliable than a remembered
+        // FM label. Visible live radio wins over legacy/notification fallbacks.
+        boolean playingSession = "PLAYING".equals(media.state);
+        boolean preferRadio = radioLive && !playingSession;
+        diag("route", preferRadio ? "OEM FM/RDS" :
+                !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
+
+        // Do not update cached sent values while BLE is disconnected.
+        // After reconnection the ready callback resets all caches.
+        if (!ble.ready()) return;
+
+        if (preferRadio) {
+            if (!oldMedia.isEmpty()) {
+                ble.send("MEDIA:STOP");
+                oldMedia = "";
+                sentMedia = 0;
             }
-            if(ble.ready() && (validRadio || radioKnown) && (frequencyChanged || !station.equals(oldStation))){
-                if(station.isEmpty())ble.send("CLEAR:RDS");
-                else ble.send("RDS:"+station);
-                oldStation=station;
+
+            final boolean frequencyChanged = !freq.equals(oldFreq);
+            final boolean stationChanged = !station.equals(oldStation);
+
+            if (frequencyChanged && !oldFreq.isEmpty()) {
+                // Invalidate previous station only on actual retuning.
+                ble.send("CLEAR:RDS");
+                oldStation = "";
             }
-        } else if(!media.title.isEmpty()){
-            if(!oldFreq.isEmpty()||!oldStation.isEmpty()){
-                ble.send("CLEAR:FM");ble.send("CLEAR:RDS");oldFreq="";oldStation="";radioKnown=false;
+            if (!freq.isEmpty() && (frequencyChanged || now - sentRadio >= 10000)) {
+                ble.send("FM:FM " + freq);
+                oldFreq = freq;
+                sentRadio = now;
+            } else if (freq.isEmpty() && !oldFreq.isEmpty()) {
+                ble.send("CLEAR:FM");
+                oldFreq = "";
             }
-            if(ble.ready() && (!media.title.equals(oldMedia)||now-sentMedia>60000)){
-                ble.send("TITLE:"+media.title);oldMedia=media.title;sentMedia=now;
+
+            if (!station.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
+                ble.send("RDS:" + station);
+                oldStation = station;
+                sentStation = now;
+            } else if (station.isEmpty() && !oldStation.isEmpty()) {
+                ble.send("CLEAR:RDS");
+                oldStation = "";
             }
-        }else{
-            if(!oldMedia.isEmpty()){ble.send("MEDIA:STOP");oldMedia="";}
-            // FM/RDS are static until the station changes or MP3 starts.
-            // Simply leaving the FM window must not erase the Opel display.
         }
-        diag("route",preferRadio?"OEM FM":!media.title.isEmpty()?"MP3 / MEDIA":"BRAK DANYCH");
+        else if (!media.title.isEmpty()) {
+            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
+                ble.send("CLEAR:FM");
+                ble.send("CLEAR:RDS");
+                oldFreq = "";
+                oldStation = "";
+                sentRadio = sentStation = 0;
+            }
+            if (!media.title.equals(oldMedia) || now - sentMedia >= 10000) {
+                ble.send("TITLE:" + media.title);
+                oldMedia = media.title;
+                sentMedia = now;
+            }
+        }
+        else {
+            // Stop immediately once all live music sources have disappeared.
+            if (!oldMedia.isEmpty()) {
+                ble.send("MEDIA:STOP");
+                oldMedia = "";
+                sentMedia = 0;
+            }
+            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
+                ble.send("CLEAR:FM");
+                ble.send("CLEAR:RDS");
+                oldFreq = oldStation = "";
+                sentRadio = sentStation = 0;
+            }
+        }
     }
     private MediaResult findPlayingMedia(){
         MediaResult best=new MediaResult();
@@ -161,7 +206,7 @@ public final class MediaBridgeService extends Service {
         SharedPreferences p=getSharedPreferences("krupas_legacy",0);
         MediaResult x=new MediaResult();
         long t=p.getLong("seen",0);
-        if(now-t>10000 || !p.getBoolean("playing",false))return x;
+        if(t<=0 || now<t || now-t>8000 || !p.getBoolean("playing",false))return x;
         x.title=SourceRouter.mediaDisplay(p.getString("title",""),p.getString("artist",""));
         x.pkg=p.getString("pkg","legacy");x.state="LEGACY";
         return x;
@@ -170,7 +215,7 @@ public final class MediaBridgeService extends Service {
         MediaResult m=new MediaResult();
         SharedPreferences p=getSharedPreferences("krupas_mp3_ui",0);
         long stamp=p.getLong("seen",0);
-        if(stamp==0 || now-stamp>20000 || stamp<radioSeen)return m;
+        if(stamp==0 || now<stamp || now-stamp>7000 || stamp<radioSeen || !p.getBoolean("visible",false))return m;
         m.title=SourceRouter.clean(p.getString("title",""));
         m.pkg=p.getString("pkg","mp3-ui");m.state="MP3 UI";
         return m;
@@ -179,7 +224,7 @@ public final class MediaBridgeService extends Service {
         MediaResult m=new MediaResult();
         SharedPreferences p=getSharedPreferences("krupas_mp3_notification",0);
         long t=p.getLong("seen",0);
-        if(t==0 || now-t>45000 || t<radioSeen)return m;
+        if(t==0 || now<t || now-t>12000 || t<radioSeen)return m;
         m.title=SourceRouter.clean(p.getString("title",""));
         m.pkg=p.getString("pkg","notification");m.state="NOTIFICATION";
         return m;
@@ -192,7 +237,6 @@ public final class MediaBridgeService extends Service {
             if(b==null)return;
             String title=SourceRouter.clean(first(b,"track","title","song"));
             String artist=SourceRouter.clean(first(b,"artist","ARTIST_NAME"));
-            if(title.isEmpty())return;
             String state=first(b,"playing","playstate","state");
             boolean playing=!"false".equalsIgnoreCase(state) && !"0".equals(state) && !"paused".equalsIgnoreCase(state);
             getSharedPreferences("krupas_legacy",0).edit().putLong("seen",System.currentTimeMillis())
