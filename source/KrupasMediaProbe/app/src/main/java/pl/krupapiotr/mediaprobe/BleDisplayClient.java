@@ -145,6 +145,7 @@ final class BleDisplayClient {
             else {fail("CHAR ESP NIE OBSŁUGUJE WRITE (PROP="+properties+")");return;}
             if(timeoutTask!=null)h.removeCallbacks(timeoutTask);
             failures=0;ready=true;busy=false;
+            queue.clear(); // Never replay previous BLE session on reconnection.
             log("BLE OK ZAFIRA-DISPLAY / WRITE="+(writeType==1?"NO_RESPONSE":"DEFAULT"));
             notifyReady.run();
             sendNext();
@@ -167,9 +168,17 @@ final class BleDisplayClient {
     void send(String s){
         if(s==null || s.isEmpty())return;
         h.post(()->{
-            if(queue.size()>=20)queue.pollFirst();
-            queue.addLast(s); // retain messages while disconnected
             if(!running)start();
+            // Fresh state is resent by MediaBridgeService after reconnect.
+            // Old media/stop frames must never outlive the BLE connection.
+            if(!ready)return;
+            if(s.equals(queue.peekLast()))return;
+            if(queue.size()>=20){
+                // Do not remove an in-flight confirmed write.
+                if(busy)return;
+                queue.clear();
+            }
+            queue.addLast(s);
             sendNext();
         });
     }
@@ -221,7 +230,8 @@ final class BleDisplayClient {
     private void fail(String reason){log(reason);stopScan();cleanup();failures++;retry(Math.min(30000,2000*(1<<Math.min(4,failures-1))));}
     private void retry(int delay){ if(!running)return; if(retryTask!=null)h.removeCallbacks(retryTask);retryTask=this::attempt;h.postDelayed(retryTask,delay);}
     private void cleanup(){
-        ready=false;busy=false;write=null; // retain unsent messages for next connection
+        ready=false;busy=false;write=null;
+        queue.clear(); // Discard obsolete titles and CLEAR commands on disconnect.
         BluetoothGatt old=gatt;gatt=null;
         safeClose(old);
     }
