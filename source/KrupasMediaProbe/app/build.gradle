@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'pl.krupapiotr.mediaprobe'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'pl.krupapiotr.mediaprobe'
+        minSdk 23
+        targetSdk 32
+        versionCode 8
+        versionName '0.8'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
