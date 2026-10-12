@@ -20,13 +20,12 @@ public final class RadioAccessibilityService extends AccessibilityService {
         if (now - lastScan < 350) return;
         lastScan = now;
         AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) return;
         List<String> strings = new ArrayList<>();
         // OEM radio can publish RDS in an AccessibilityEvent only briefly.
         if(event.getText()!=null) for(CharSequence text:event.getText()) if(text!=null)addUnique(strings,text.toString());
         if(event.getContentDescription()!=null)addUnique(strings,event.getContentDescription().toString());
         ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
-        q.add(root);
+        if(root!=null)q.add(root);
         int visited = 0;
         while (!q.isEmpty() && visited++ < 250) {
             AccessibilityNodeInfo n = q.removeFirst();
@@ -59,7 +58,9 @@ public final class RadioAccessibilityService extends AccessibilityService {
         }
         // A station should be supported by a visible frequency: otherwise do not
         // mistake a generic Android button/menu label for an RDS station name.
-        if (!freq.isEmpty()) for (String s : strings) {
+        boolean hasFrequencyContext=!freq.isEmpty() ||
+                !getSharedPreferences("krupas_radio",MODE_PRIVATE).getString("freq","").isEmpty();
+        if (hasFrequencyContext) for (String s : strings) {
             if (!SourceRouter.validStation(s)) continue;
             String u = s.toUpperCase(java.util.Locale.ROOT);
             if (u.contains("RADIO") || u.contains("PRZEBOJE") || u.contains("RMF") ||

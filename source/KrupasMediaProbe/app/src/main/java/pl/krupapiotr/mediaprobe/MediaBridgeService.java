@@ -102,7 +102,11 @@ public final class MediaBridgeService extends Service {
         diag("radio_status",radioPkg+" / "+freq+" / "+station+" / age="+(now-radioSeen)+"ms");
         // FM may stay on in the background: preserve the last known station
         // during this service session, but give actual playing MP3 precedence.
-        boolean preferRadio=(validRadio || radioKnown) && media.title.isEmpty();
+        // A freshly visible OEM FM window beats stale MediaSession metadata.
+        // A newer visible MP3 player may still take over immediately.
+        long mp3Seen=getSharedPreferences("krupas_mp3_ui",0).getLong("seen",0);
+        boolean newerVisibleMp3=!media.title.isEmpty() && mp3Seen>radioSeen && now-mp3Seen<7000;
+        boolean preferRadio=(validRadio && !newerVisibleMp3) || (radioKnown && media.title.isEmpty());
         if(preferRadio){
             if(!oldMedia.isEmpty()){ble.send("MEDIA:STOP");oldMedia="";}
             String effectiveFreq=!freq.isEmpty()?freq:oldFreq;
