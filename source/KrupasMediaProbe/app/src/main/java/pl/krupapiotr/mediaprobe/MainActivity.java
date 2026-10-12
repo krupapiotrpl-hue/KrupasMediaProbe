@@ -23,7 +23,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
-        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 0.8 • K706");
+        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 0.9 • K706");
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
         hint.setTextSize(14);root.addView(hint);
@@ -62,12 +62,15 @@ public final class MainActivity extends Activity {
         String notificationListeners=Settings.Secure.getString(getContentResolver(),"enabled_notification_listeners");
         String accessibility=Settings.Secure.getString(getContentResolver(),"enabled_accessibility_services");
         status.setText("BLE: "+d.getString("ble","BRAK")+"\n"+
+                "OSTATNIA TRANSMISJA: "+d.getString("last_tx","BRAK")+"\n"+
                 "ŹRÓDŁO: "+d.getString("route","BRAK")+"\n"+
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "NOTYFIKACJE: "+(notificationListeners!=null&&notificationListeners.contains(getPackageName())?"OK":"BRAK UPRAWNIEŃ")+"\n"+
                 "DOSTĘPNOŚĆ RADIO: "+(accessibility!=null&&accessibility.contains(getPackageName()+"/"+RadioAccessibilityService.class.getName())?"OK":"SPRAWDŹ")+"\n\n"+
                 "OSTATNI EKRAN FM: "+r.getString("nodes","brak")+"\n\n"+
+                "OSTATNIE MP3 Z POWIADOMIENIA: "+getSharedPreferences("krupas_mp3_notification",0).getString("title","brak")+"\n"+
+                "MP3 Z WIDOKU: "+getSharedPreferences("krupas_mp3_ui",0).getString("title","brak")+"\n\n"+
                 "DIAG SESJI: "+d.getString("session_error","—")+"\n"+
                 "BŁĄD: "+d.getString("error","—"));
     }

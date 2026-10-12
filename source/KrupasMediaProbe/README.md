@@ -1,8 +1,8 @@
-# KRUPAS Media Pro 0.8 — Roko K706 / ESP32-S3 (wersja źródłowa testowa)
+# KRUPAS Media Pro 0.9 — Roko K706 / ESP32-S3 (wersja źródłowa testowa)
 
 Cel: pobieranie tytułów MP3 i częstotliwości/nazw stacji z aplikacji radia FM oraz automatyczne przesyłanie ich do LilyGO T-2CAN (ZAFIRA-DISPLAY) przez BLE GATT.
 
-**Status**: kompletne źródła, podstawowe testy logiki na JVM. NIE przetestowano ani kompilacji Android SDK, ani działania na prawdziwym Roko K706. APK 0.7 użytkownika nie było dostępne w postaci aktualnych źródeł, więc ta wersja została zrekonstruowana na podstawie 0.1 i znanego interfejsu ESP. Nie jest to bezpośrednia binarna poprawka aktualnie zainstalowanej aplikacji. Przed instalacją wykonaj kopię istniejącej wersji APK.
+**Status**: aktualizowane źródła przygotowane do kompilacji w GitHub Actions. Po kompilacji nadal wymagany test sprzętowy Roko K706 + ESP32-S3. APK 0.7 użytkownika nie było dostępne w postaci aktualnych źródeł, więc ta wersja została zrekonstruowana na podstawie 0.1 i znanego interfejsu ESP. Nie jest to bezpośrednia binarna poprawka aktualnie zainstalowanej aplikacji. Przed instalacją wykonaj kopię istniejącej wersji APK.
 
 ## Dlaczego dwa odczyty?
 * MP3: MediaSession (tylko sesje `STATE_PLAYING`), następnie aktywne starsze broadcasty odtwarzaczy, awaryjnie ostatnio widoczny tytuł z widoku MP3 przez AccessibilityService.
@@ -27,7 +27,9 @@ Wiadomości: `FM:FM 107.0`, `RDS:RMF FM`, `TITLE:Perfect - Autobiografia`, `MEDI
 3. W Dostępności włącz `KRUPAS - odczyt ekranu radia FM`.
 4. Zezwól na automatyczne uruchamianie i pracę w tle, jeśli firmware K706 posiada swoje ograniczenia oszczędzania energii.
 5. Na wyświetlaczu aplikacji obserwuj `BLE`, `ŹRÓDŁO`, `MP3`, `RADIO`, `OSTATNI EKRAN FM`.
-6. Testy `FM 107.0` / `MP3` klikaj po stanie BLE OK. To test łącza, nie dowód odczytu realnego RDS.
+6. Testy `FM 107.0` / `MP3` można kliknąć również przed połączeniem: wiadomości zostaną zakolejkowane.
+7. Obserwuj `OSTATNIA TRANSMISJA`, `OSTATNIE MP3 Z POWIADOMIENIA` i `OSTATNI EKRAN FM`.
+8. Gdy radio OEM rysuje RDS wyłącznie jako obraz, odczyt przez Dostępność nadal wymaga integracji z aplikacją OEM.
 
 ## Ograniczenia
 * Accessibility nie gwarantuje odczytu nazwy stacji w aplikacji OEM FM. Jeśli widzisz częstotliwość, ale brak RDS, prześlij sekcję OSTATNI EKRAN FM, aby dopasować selektor.
