@@ -1,0 +1,12 @@
+KRUPAS Media Pro 0.8 SOURCE TEST — 11.10.2026
+- Stanowczo rozdzielono źródła OEM FM/RDS i MEDIA/MP3.
+- Do MP3 priorytet MediaSession STATE_PLAYING; starsze emisje i UI jako fallback.
+- Radia FM odczyt częstotliwości 87.5..108.0 oraz rozpoznawanie RDS z ekranu.
+- BLE: automatyczny scan nazwy ZAFIRA-DISPLAY; połączenie GATT po wykryciu.
+- Auto-reconnect z rosnącym opóźnieniem; zamykanie sesji GATT.
+- MTU request 185 z fallback; kolejka zapisów i watchdog GATT.
+- Android 12+ pozwolenia SCAN, CONNECT; odbudowa service po restarcie.
+- Stabilne FM/RDS nie znika tylko dlatego, że użytkownik wyszedł z okna radia.
+- Stary tytuł MP3 usuwany po zaniku aktywnej sesji.
+- Diagnostyka pakietów Android i odczytu UI/medium.
+- To projekt źródłowy, nie zweryfikowany na urządzeniu APK.
