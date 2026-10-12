@@ -39,7 +39,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: KRUPAS-Media-Pro-0.9-K706-APK
-          path: KRUPAS-Media-Pro-0.8-K706.apk
+          path: KRUPAS-Media-Pro-0.9-K706.apk
           if-no-files-found: error
       - name: Opublikuj instalator w GitHub Releases
         if: github.ref == 'refs/heads/main'
@@ -49,5 +49,5 @@ jobs:
           if ! gh release view 'v0.9-k706' >/dev/null 2>&1; then
             gh release create 'v0.9-k706' --title 'KRUPAS Media Pro 0.9 (K706)' --notes 'Testowa wersja BLE + MP3 + FM/RDS. APK debug; mozliwy konflikt podpisu ze stara instalacja.'
           fi
-          gh release upload 'v0.9-k706' KRUPAS-Media-Pro-0.8-K706.apk --clobber
+          gh release upload 'v0.9-k706' KRUPAS-Media-Pro-0.9-K706.apk --clobber
         continue-on-error: true
