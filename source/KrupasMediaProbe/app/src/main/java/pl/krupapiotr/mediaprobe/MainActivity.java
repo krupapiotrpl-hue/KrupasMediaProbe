@@ -22,17 +22,20 @@ public final class MainActivity extends Activity {
     private final Runnable tick=new Runnable(){@Override public void run(){refresh();h.postDelayed(this,1300);}};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
-        LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
-        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.0 • K706");
-        heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
-        TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
-        hint.setTextSize(14);root.addView(hint);
-        addButton(root,"1. UPRAWNIENIA BLUETOOTH",()->requestBle());
-        addButton(root,"2. DOSTĘP DO POWIADOMIEŃ (MP3)",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
-        addButton(root,"3. DOSTĘPNOŚĆ (ORYGINALNE FM/RDS)",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        addButton(root,"START / WZNÓW AUTOMATYCZNE BLE",()->startBridge(null));
-        addButton(root,"TEST FM 107.0",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
-        addButton(root,"TEST MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
+        LinearLayout root=new LinearLayout(this);root.setPadding(dp(12),dp(8),dp(12),dp(8));root.setOrientation(LinearLayout.VERTICAL);
+        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 2.0 TEST • K706");
+        heading.setTextSize(20);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
+        TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, FM / RDS / MP3. Dostęp FM: Dostępność. MP3: Powiadomienia.");
+        hint.setTextSize(12);root.addView(hint);
+        // Compact landscape layout: all controls are arranged horizontally, in two rows of three.
+        LinearLayout row1=buttonRow(root);
+        addButton(row1,"Bluetooth",()->requestBle());
+        addButton(row1,"Powiadomienia",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        addButton(row1,"Dostęp FM",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        LinearLayout row2=buttonRow(root);
+        addButton(row2,"Start BLE",()->startBridge(null));
+        addButton(row2,"Test FM",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
+        addButton(row2,"Test MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
         ScrollView sv=new ScrollView(this);
         status=new TextView(this);status.setTextSize(14);status.setTypeface(Typeface.MONOSPACE);status.setTextIsSelectable(true);
         sv.addView(status);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
@@ -40,7 +43,30 @@ public final class MainActivity extends Activity {
         requestBle();startBridge(null);
         h.post(tick);
     }
-    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setOnClickListener(v->f.run());layout.addView(b);}
+    private int dp(int x){return (int)(x*getResources().getDisplayMetrics().density+0.5f);}
+    private LinearLayout buttonRow(LinearLayout root){
+        LinearLayout row=new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+        params.topMargin=dp(3);
+        root.addView(row,params);
+        return row;
+    }
+    private void addButton(LinearLayout row,String title,Runnable f){
+        Button b=new Button(this);
+        b.setText(title);
+        b.setTextSize(11);
+        b.setAllCaps(false);
+        b.setSingleLine(true);
+        b.setMinimumWidth(0);
+        b.setMinimumHeight(0);
+        b.setPadding(dp(3),0,dp(3),0);
+        b.setOnClickListener(v->f.run());
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(44),1f);
+        params.leftMargin=dp(2);
+        params.rightMargin=dp(2);
+        row.addView(b,params);
+    }
     private void startBridge(String action){
         try{Intent i=new Intent(this,MediaBridgeService.class);if(action!=null)i.setAction(action);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
