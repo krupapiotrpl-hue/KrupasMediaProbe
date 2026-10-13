@@ -1,10 +1,12 @@
-name: KRUPAS Media Pro 1.0 APK
+name: KRUPAS Media Pro K706 APK
 on:
   push:
     branches: [main, 'fix/**']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,20 +36,10 @@ jobs:
       - name: Zweryfikuj i nazwij APK
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.0-K706.apk
-          sha256sum KRUPAS-Media-Pro-1.0-K706.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-2.0-K706-TEST.apk
+          sha256sum KRUPAS-Media-Pro-2.0-K706-TEST.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.0-K706-APK
-          path: KRUPAS-Media-Pro-1.0-K706.apk
+          name: KRUPAS-Media-Pro-2.0-K706-TEST-APK
+          path: KRUPAS-Media-Pro-2.0-K706-TEST.apk
           if-no-files-found: error
-      - name: Opublikuj instalator w GitHub Releases
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if ! gh release view 'v1.0-k706' >/dev/null 2>&1; then
-            gh release create 'v1.0-k706' --title 'KRUPAS Media Pro 1.0 (K706)' --notes 'Testowa wersja 1.0: stabilizacja zrodel FM/RDS i MP3, czyszczenie starych danych BLE, diagnostyka K706. APK debug; mozliwy konflikt podpisu ze stara instalacja.'
-          fi
-          gh release upload 'v1.0-k706' KRUPAS-Media-Pro-1.0-K706.apk --clobber
-        continue-on-error: true
