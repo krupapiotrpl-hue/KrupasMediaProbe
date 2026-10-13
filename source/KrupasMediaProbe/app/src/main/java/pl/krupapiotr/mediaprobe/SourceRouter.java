@@ -13,6 +13,10 @@ final class SourceRouter {
         if (v == null) return "";
         String s = v.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim();
         if (s.equalsIgnoreCase("unknown") || s.equalsIgnoreCase("<unknown>") ||
+                s.equalsIgnoreCase("none") || s.equalsIgnoreCase("<none>") ||
+                s.equalsIgnoreCase("todo") || s.equalsIgnoreCase("undefined") ||
+                s.equalsIgnoreCase("n/a") || s.equalsIgnoreCase("no rds") ||
+                s.equalsIgnoreCase("brak danych") ||
                 s.equalsIgnoreCase("null") || s.equalsIgnoreCase("unknown title")) return "";
         return s.length() > 90 ? s.substring(0, 90) : s;
     }
