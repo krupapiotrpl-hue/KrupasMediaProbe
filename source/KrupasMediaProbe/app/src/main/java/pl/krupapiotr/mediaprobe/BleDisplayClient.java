@@ -138,14 +138,17 @@ final class BleDisplayClient {
             write=s==null?null:s.getCharacteristic(CHAR);
             if(write==null){fail("BRAK CHAR WRITE - SPRAWDŹ UUID ESP");return;}
             int properties=write.getProperties();
-            if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)!=0)
-                writeType=BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
-            else if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE)!=0)
+            // Prefer acknowledged WRITE whenever ESP exposes it.  K706 used to
+            // report a successful local NO_RESPONSE enqueue even when the packet
+            // never reached the ESP.  DEFAULT gives us an actual GATT callback.
+            if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE)!=0)
                 writeType=BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
+            else if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)!=0)
+                writeType=BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
             else {fail("CHAR ESP NIE OBSŁUGUJE WRITE (PROP="+properties+")");return;}
             if(timeoutTask!=null)h.removeCallbacks(timeoutTask);
             failures=0;ready=true;busy=false;
-            queue.clear(); // Never replay previous BLE session on reconnection.
+            // Do not clear packets queued while this very connection was being established.
             log("BLE OK ZAFIRA-DISPLAY / WRITE="+(writeType==1?"NO_RESPONSE":"DEFAULT"));
             notifyReady.run();
             sendNext();
@@ -154,7 +157,12 @@ final class BleDisplayClient {
             if(source!=gatt || !ready)return;
             if(writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)return; // locally paced
             busy=false;
-            if(status==BluetoothGatt.GATT_SUCCESS){if(!queue.isEmpty())queue.pollFirst();sendNext();}
+            if(status==BluetoothGatt.GATT_SUCCESS){
+                String confirmed=queue.isEmpty()?"":queue.pollFirst();
+                if(!confirmed.isEmpty())context.getSharedPreferences("krupas_diag",0).edit()
+                        .putString("last_tx",confirmed).putString("tx_state","POTWIERDZONE PRZEZ GATT").apply();
+                sendNext();
+            }
             else fail("BLE WRITE STATUS "+status);
         });}
     };
@@ -171,7 +179,15 @@ final class BleDisplayClient {
             if(!running)start();
             // Fresh state is resent by MediaBridgeService after reconnect.
             // Old media/stop frames must never outlive the BLE connection.
-            if(!ready)return;
+            if(!ready){
+                // Keep only fresh user/test data until the connection becomes ready.
+                // This makes a TEST pressed during a short reconnect actually run.
+                if(queue.size()>=6)queue.clear();
+                if(!s.equals(queue.peekLast()))queue.addLast(s);
+                context.getSharedPreferences("krupas_diag",0).edit()
+                        .putString("tx_state","OCZEKUJE NA BLE: "+s).apply();
+                return;
+            }
             if(s.equals(queue.peekLast()))return;
             if(queue.size()>=20){
                 // Do not remove an in-flight confirmed write.
@@ -196,12 +212,16 @@ final class BleDisplayClient {
                 ok=gatt.writeCharacteristic(write);
             }
             if(!ok){busy=false;fail("BLE WRITE FALSE");return;}
-            context.getSharedPreferences("krupas_diag",0).edit().putString("last_tx",queue.peekFirst()).apply();
+            context.getSharedPreferences("krupas_diag",0).edit()
+                    .putString("tx_attempt",queue.peekFirst())
+                    .putString("tx_state",writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE?"WYSŁANO NO_RESPONSE":"WYSŁANO - CZEKAM NA GATT").apply();
             if(writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE){
                 final BluetoothGatt sentOn=gatt;
                 h.postDelayed(()->{
                     if(sentOn!=gatt || !ready || !busy)return;
-                    if(!queue.isEmpty())queue.pollFirst();
+                    String sent=queue.isEmpty()?"":queue.pollFirst();
+                    if(!sent.isEmpty())context.getSharedPreferences("krupas_diag",0).edit()
+                            .putString("last_tx",sent).putString("tx_state","WYSŁANO NO_RESPONSE").apply();
                     busy=false;sendNext();
                 },200);
             }
