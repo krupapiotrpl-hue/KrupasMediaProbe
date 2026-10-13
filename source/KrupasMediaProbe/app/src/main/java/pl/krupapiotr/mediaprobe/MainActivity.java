@@ -15,6 +15,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.graphics.Typeface;
+import android.view.ViewGroup;
+import android.view.Gravity;
 
 public final class MainActivity extends Activity {
     private final Handler h=new Handler(Looper.getMainLooper());
@@ -23,7 +25,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
-        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.0 • K706");
+        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.1 • K706");
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
         hint.setTextSize(14);root.addView(hint);
@@ -40,7 +42,18 @@ public final class MainActivity extends Activity {
         requestBle();startBridge(null);
         h.post(tick);
     }
-    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setOnClickListener(v->f.run());layout.addView(b);}
+    private void addButton(LinearLayout layout,String title,Runnable f){
+        Button b=new Button(this);
+        b.setText(title);b.setTextSize(13);b.setAllCaps(false);
+        b.setMinWidth(0);b.setMinimumWidth(0);
+        b.setPadding(dp(14),0,dp(14),0);
+        b.setOnClickListener(v->f.run());
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,dp(48));
+        lp.gravity=Gravity.START;lp.topMargin=dp(3);lp.bottomMargin=dp(3);
+        layout.addView(b,lp);
+    }
+    private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private void startBridge(String action){
         try{Intent i=new Intent(this,MediaBridgeService.class);if(action!=null)i.setAction(action);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
@@ -63,6 +76,8 @@ public final class MainActivity extends Activity {
         String accessibility=Settings.Secure.getString(getContentResolver(),"enabled_accessibility_services");
         status.setText("BLE: "+d.getString("ble","BRAK")+"\n"+
                 "OSTATNIA TRANSMISJA: "+d.getString("last_tx","BRAK")+"\n"+
+                "PRÓBA TX: "+d.getString("tx_attempt","BRAK")+"\n"+
+                "STAN TX: "+d.getString("tx_state","BRAK")+"\n"+
                 "ŹRÓDŁO: "+d.getString("route","BRAK")+"\n"+
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
