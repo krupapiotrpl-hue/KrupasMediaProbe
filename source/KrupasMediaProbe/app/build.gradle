@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 32
-        versionCode 30
-        versionName '3.0-DIAG1'
+        versionCode 31
+        versionName '3.0-DIAG2'
     }
 
     buildTypes {
