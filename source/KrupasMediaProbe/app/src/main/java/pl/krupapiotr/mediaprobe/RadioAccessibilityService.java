@@ -11,8 +11,7 @@ import java.util.List;
 
 /**
  * Passive OEM FM/RDS and MP3 reader for K706.
- * Refreshes the visible radio window even when Android does not send text events.
- * No buttons are clicked and no text is injected into the radio application.
+ * Keeps radio state stable across short overlays and reads station + RadioText separately.
  */
 public final class RadioAccessibilityService extends AccessibilityService {
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -38,7 +37,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
         super.onServiceConnected();
         connected = true;
         handler.removeCallbacks(sampler);
-        handler.postDelayed(sampler, 2000);
+        handler.postDelayed(sampler, 1500);
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -48,10 +47,23 @@ public final class RadioAccessibilityService extends AccessibilityService {
         boolean mp3 = SourceRouter.isAudioPackage(pkg) && !radio;
 
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            getSharedPreferences("krupas_radio", MODE_PRIVATE).edit()
-                    .putBoolean("visible", radio).apply();
-            getSharedPreferences("krupas_mp3_ui", MODE_PRIVATE).edit()
-                    .putBoolean("visible", mp3).apply();
+            if (radio) {
+                getSharedPreferences("krupas_radio", MODE_PRIVATE).edit()
+                        .putBoolean("visible", true).putString("last_window", pkg).apply();
+                getSharedPreferences("krupas_mp3_ui", MODE_PRIVATE).edit()
+                        .putBoolean("visible", false).apply();
+            } else if (mp3) {
+                getSharedPreferences("krupas_mp3_ui", MODE_PRIVATE).edit()
+                        .putBoolean("visible", true).apply();
+                getSharedPreferences("krupas_radio", MODE_PRIVATE).edit()
+                        .putBoolean("visible", false).putString("last_window", pkg).apply();
+            } else {
+                // System overlays, volume panels and navigation must not invalidate FM/RDS.
+                getSharedPreferences("krupas_mp3_ui", MODE_PRIVATE).edit()
+                        .putBoolean("visible", false).apply();
+                getSharedPreferences("krupas_radio", MODE_PRIVATE).edit()
+                        .putString("last_window", pkg).apply();
+            }
         }
         if (!radio && !mp3) return;
 
@@ -61,7 +73,6 @@ public final class RadioAccessibilityService extends AccessibilityService {
         lastScan = now;
 
         AccessibilityNodeInfo root = getRootInActiveWindow();
-        // Do not attach labels from another application to an OEM FM event.
         if (root != null && root.getPackageName() != null &&
                 !pkg.equals(root.getPackageName().toString())) root = null;
         capture(pkg, event, root);
@@ -92,41 +103,58 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if (child != null) queue.add(child);
             }
         }
+
         long now = System.currentTimeMillis();
         if (mp3) {
             String title = "";
+            String artist = "";
             for (String item : strings) {
                 String u = item.toUpperCase(java.util.Locale.ROOT);
-                if (item.length() < 5 || item.length() > 90 || !item.matches(".*[\\p{L}].*")) continue;
+                if (item.length() < 3 || item.length() > 90 || !item.matches(".*[\\p{L}].*")) continue;
                 if (u.matches(".*\\b(?:MP3|USB|SD|MUSIC|LOCAL|ALL SONGS|PLAYLIST|ALBUM|ARTIST|REPEAT|SHUFFLE|NEXT|BACK|PLAY|PAUSE|STOP|NOW PLAYING|FOLDER|FAVORITES|SETTINGS)\\b.*")) continue;
                 if (item.matches("^[0-9:./ -]+$")) continue;
-                title = item;
-                break;
+                if (title.isEmpty()) title = item;
+                else if (!item.equalsIgnoreCase(title)) { artist = item; break; }
             }
             android.content.SharedPreferences.Editor e = getSharedPreferences("krupas_mp3_ui", MODE_PRIVATE)
                     .edit().putString("pkg", pkg).putString("nodes", strings.toString())
                     .putBoolean("visible", true);
-            if (!title.isEmpty()) e.putString("title", title).putLong("seen", now);
+            if (!title.isEmpty()) {
+                e.putString("title", title).putString("artist", artist).putLong("seen", now);
+            }
             e.apply();
             return;
         }
 
         String freq = "";
-        String station = "";
         for (String item : strings) {
             String detected = SourceRouter.frequency(item);
             if (!detected.isEmpty()) { freq = detected; break; }
         }
-        // Accept all plausible station names, not only a fixed list of broadcasters.
+
+        List<String> stationCandidates = new ArrayList<>();
+        for (String item : strings) if (SourceRouter.validStation(item)) stationCandidates.add(item);
+        String station = "";
+        for (String item : stationCandidates) {
+            if (item.length() <= 20) { station = item; break; }
+        }
+        if (station.isEmpty() && !stationCandidates.isEmpty()) station = stationCandidates.get(0);
+
+        String radioText = "";
         for (String item : strings) {
-            if (SourceRouter.validStation(item)) { station = item; break; }
+            if (SourceRouter.validRadioText(item, station)) {
+                if (!item.equalsIgnoreCase(station)) { radioText = item; break; }
+            }
         }
 
         android.content.SharedPreferences pref = getSharedPreferences("krupas_radio", MODE_PRIVATE);
         String previousFreq = pref.getString("freq", "");
         String previousStation = pref.getString("station", "");
+        String previousText = pref.getString("radio_text", "");
         boolean tuned = !freq.isEmpty() && !freq.equals(previousFreq);
+
         String resolvedStation = !station.isEmpty() ? station : (tuned ? "" : previousStation);
+        String resolvedText = !radioText.isEmpty() ? radioText : (tuned ? "" : previousText);
 
         android.content.SharedPreferences.Editor e = pref.edit()
                 .putString("pkg", pkg)
@@ -134,9 +162,10 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 .putBoolean("visible", true);
         if (!freq.isEmpty()) e.putString("freq", freq);
         if (!station.isEmpty() || tuned) e.putString("station", resolvedStation);
-        // A visible FM screen is a heartbeat even if its label is static.
-        if (!freq.isEmpty() || !station.isEmpty() ||
-                (!previousFreq.isEmpty() || !previousStation.isEmpty()) && root != null) {
+        if (!radioText.isEmpty() || tuned) e.putString("radio_text", resolvedText);
+
+        if (!freq.isEmpty() || !station.isEmpty() || !radioText.isEmpty() ||
+                ((!previousFreq.isEmpty() || !previousStation.isEmpty() || !previousText.isEmpty()) && root != null)) {
             e.putLong("seen", now);
         }
         e.apply();
