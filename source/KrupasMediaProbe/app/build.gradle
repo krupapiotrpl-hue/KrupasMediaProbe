@@ -6,15 +6,6 @@ android {
     namespace 'pl.krupapiotr.mediaprobe'
     compileSdk 35
 
-    signingConfigs {
-        debug {
-            storeFile file('krupas-debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
-        }
-    }
-
     defaultConfig {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
@@ -24,12 +15,8 @@ android {
     }
 
     buildTypes {
-        debug {
-            signingConfig signingConfigs.debug
-        }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
         }
     }
 
