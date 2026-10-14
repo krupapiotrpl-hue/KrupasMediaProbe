@@ -2,6 +2,8 @@ name: KRUPAS Media Pro 3.0 DIAG-1 APK
 on:
   push:
     branches: [main, 'fix/**']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
