@@ -23,7 +23,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
-        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.1 • K706");
+        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.2 TEST • K706");
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3. FM/RDS zachowuje stan przez krótkie nakładki, multimedia wygaszają stare dane.");
         hint.setTextSize(14);root.addView(hint);
@@ -37,7 +37,9 @@ public final class MainActivity extends Activity {
         status=new TextView(this);status.setTextSize(14);status.setTypeface(Typeface.MONOSPACE);status.setTextIsSelectable(true);
         sv.addView(status);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
-        requestBle();startBridge(null);
+        requestBle();
+        startBridge(null);
+        MediaProbeNotificationService.ensureBound(this);
         h.post(tick);
     }
 
@@ -73,7 +75,8 @@ public final class MainActivity extends Activity {
         android.content.SharedPreferences d=getSharedPreferences("krupas_diag",0);
         android.content.SharedPreferences r=getSharedPreferences("krupas_radio",0);
         android.content.SharedPreferences n=getSharedPreferences("krupas_mp3_notification",0);
-        String notificationListeners=Settings.Secure.getString(getContentResolver(),"enabled_notification_listeners");
+        boolean notificationAccess=MediaProbeNotificationService.isAccessEnabled(this);
+        boolean listenerConnected=MediaProbeNotificationService.isListenerConnected(this);
         String accessibility=Settings.Secure.getString(getContentResolver(),"enabled_accessibility_services");
         status.setText("BLE: "+d.getString("ble","BRAK")+"\n"+
                 "OSTATNIA TRANSMISJA: "+d.getString("last_tx","BRAK")+"\n"+
@@ -81,13 +84,20 @@ public final class MainActivity extends Activity {
                 "MEDIA: "+d.getString("media_status","BRAK")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "RDS / RADIOTEXT: "+r.getString("station","—")+" / "+r.getString("radio_text","—")+"\n"+
-                "NOTYFIKACJE: "+(notificationListeners!=null&&notificationListeners.contains(getPackageName())?"OK":"BRAK UPRAWNIEŃ")+"\n"+
+                "NOTYFIKACJE: "+(notificationAccess?"OK":"BRAK UPRAWNIEŃ")+"\n"+
+                "LISTENER MEDIA: "+(listenerConnected?"POŁĄCZONY":"NIEPOŁĄCZONY / RE-BIND")+"\n"+
                 "DOSTĘPNOŚĆ RADIO: "+(accessibility!=null&&accessibility.contains(getPackageName()+"/"+RadioAccessibilityService.class.getName())?"OK":"SPRAWDŹ")+"\n\n"+
                 "OSTATNI EKRAN FM: "+r.getString("nodes","brak")+"\n\n"+
                 "POWIADOMIENIE MEDIA: "+n.getString("artist","")+" / "+n.getString("title","brak")+" / "+n.getString("album","")+"\n"+
                 "MP3 Z WIDOKU: "+getSharedPreferences("krupas_mp3_ui",0).getString("title","brak")+"\n\n"+
                 "DIAG SESJI: "+d.getString("session_error","—")+"\n"+
                 "BŁĄD: "+d.getString("error","—"));
+    }
+
+    @Override protected void onResume(){
+        super.onResume();
+        MediaProbeNotificationService.ensureBound(this);
+        startBridge(null);
     }
 
     @Override protected void onDestroy(){h.removeCallbacks(tick);super.onDestroy();}

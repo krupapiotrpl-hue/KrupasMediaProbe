@@ -1,4 +1,4 @@
-name: KRUPAS Media Pro 1.1 APK
+name: KRUPAS Media Pro 1.2 APK
 on:
   push:
     branches: [main, 'fix/**']
@@ -34,10 +34,10 @@ jobs:
       - name: Zweryfikuj i nazwij APK
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.1-K706.apk
-          sha256sum KRUPAS-Media-Pro-1.1-K706.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2-K706-TEST.apk
+          sha256sum KRUPAS-Media-Pro-1.2-K706-TEST.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.1-K706-APK
-          path: KRUPAS-Media-Pro-1.1-K706.apk
+          name: KRUPAS-Media-Pro-1.2-K706-TEST-APK
+          path: KRUPAS-Media-Pro-1.2-K706-TEST.apk
           if-no-files-found: error

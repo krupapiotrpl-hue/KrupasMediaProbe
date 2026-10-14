@@ -52,6 +52,7 @@ public final class MediaBridgeService extends Service {
     @Override public void onCreate(){
         super.onCreate();
         foreground();
+        MediaProbeNotificationService.ensureBound(this);
         ble=new BleDisplayClient(this,()->{
             oldFreq=oldRds=oldMedia="";
             sentRadio=sentRds=sentMedia=0;
@@ -298,11 +299,26 @@ public final class MediaBridgeService extends Service {
 
     private MediaResult findPlayingMedia(){
         MediaResult best=new MediaResult();
+        final boolean access=MediaProbeNotificationService.isAccessEnabled(this);
+        final boolean connected=MediaProbeNotificationService.isListenerConnected(this);
+        diag("listener_status",access ? (connected ? "ACCESS=OK / CONNECTED" : "ACCESS=OK / DISCONNECTED") : "ACCESS=BRAK");
+
+        if(!access){
+            diag("session_error","BRAK DOSTĘPU DO POWIADOMIEŃ DLA LISTENERA");
+            return best;
+        }
+
+        if(!connected) MediaProbeNotificationService.ensureBound(this);
+
         try{
             MediaSessionManager manager=(MediaSessionManager)getSystemService(MEDIA_SESSION_SERVICE);
-            ComponentName listener=new ComponentName(this,MediaProbeNotificationService.class);
+            ComponentName listener=MediaProbeNotificationService.component(this);
             List<MediaController> sessions=manager.getActiveSessions(listener);
-            if(sessions==null)return best;
+            if(sessions==null){
+                diag("session_error","OK / ACTIVE SESSIONS = NULL");
+                return best;
+            }
+            diag("session_error","OK / ACTIVE SESSIONS = "+sessions.size());
             for(MediaController c:sessions){
                 PlaybackState state=c.getPlaybackState();
                 if(state==null||state.getState()!=PlaybackState.STATE_PLAYING)continue;
@@ -324,7 +340,10 @@ public final class MediaBridgeService extends Service {
                 if(!candidate.hasData())continue;
                 if(!best.hasData() || (SourceRouter.isAudioPackage(pkg)&&!SourceRouter.isAudioPackage(best.pkg)))best=candidate;
             }
-        }catch(SecurityException err){diag("session_error","WŁĄCZ DOSTĘP DO POWIADOMIEŃ: "+err.getMessage());}
+        }catch(SecurityException err){
+            MediaProbeNotificationService.ensureBound(this);
+            diag("session_error","ACCESS=OK, LISTENER NIEPOŁĄCZONY: "+err.getMessage());
+        }
         catch(Exception err){diag("session_error",err.toString());}
         return best;
     }
