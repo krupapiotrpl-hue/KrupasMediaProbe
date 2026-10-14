@@ -36,7 +36,7 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
 
         TextView heading = new TextView(this);
-        heading.setText("KRUPAS MEDIA PRO 3.0 DIAG-1 • K706");
+        heading.setText("KRUPAS MEDIA PRO 3.0 DIAG-2 • K706");
         heading.setTextSize(20);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(heading);
@@ -50,7 +50,7 @@ public final class MainActivity extends Activity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         addButton(row, "Bluetooth", this::requestBle);
         addButton(row, "Dostępność FM", () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        addButton(row, "Wznów BLE", () -> startBridge(null));
+        addButton(row, "Wznów BLE", () -> startBridge(MediaBridgeService.ACTION_RESTART_BLE));
         addButton(row, "Test FM", () -> startBridge(MediaBridgeService.ACTION_TEST_FM));
         root.addView(row);
 
@@ -91,16 +91,31 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 31) {
             String[] p = {Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT};
             if (checkSelfPermission(p[0]) != PackageManager.PERMISSION_GRANTED ||
-                    checkSelfPermission(p[1]) != PackageManager.PERMISSION_GRANTED) requestPermissions(p, 8);
+                    checkSelfPermission(p[1]) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(p, 8);
+                return;
+            }
         } else if (Build.VERSION.SDK_INT >= 23 &&
                 checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 8);
+            return;
+        }
+        try {
+            BluetoothManager mgr=(BluetoothManager)getSystemService(BLUETOOTH_SERVICE);
+            BluetoothAdapter adapter=mgr==null?null:mgr.getAdapter();
+            if(adapter!=null && !adapter.isEnabled()) {
+                startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
+            } else {
+                startBridge(MediaBridgeService.ACTION_RESTART_BLE);
+            }
+        } catch (Exception ex) {
+            getSharedPreferences("krupas_diag",0).edit().putString("error","BT: "+ex).apply();
         }
     }
 
     @Override public void onRequestPermissionsResult(int rc, String[] perms, int[] grants) {
         super.onRequestPermissionsResult(rc, perms, grants);
-        startBridge(null);
+        requestBle();
     }
 
     private static String time(long t) {
@@ -128,7 +143,9 @@ public final class MainActivity extends Activity {
                 d.getString("last_frame", "—") + "\n" +
                 "powód: " + d.getString("last_frame_reason", "—") + "\n" +
                 "czas: " + time(d.getLong("last_frame_time", 0)) + "\n" +
-                "GATT przyjął: " + d.getString("last_tx", "—") + "\n" +
+                "próba GATT: " + d.getString("tx_attempt", "—") + "\n" +
+                "stan TX: " + d.getString("tx_state", "—") + "\n" +
+                "GATT potwierdził: " + d.getString("last_tx", "—") + "\n" +
                 "czas GATT: " + time(d.getLong("last_tx_time", 0)) + "\n\n" +
 
                 "4. STAN ŁĄCZA\n" +
