@@ -6,46 +6,29 @@ import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 
 public class MediaProbeNotificationService extends NotificationListenerService {
+    @Override public void onListenerConnected(){super.onListenerConnected();MediaBridgeService.poke(this,"NOTIFICATION_LISTENER_READY");}
+
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || sbn.getNotification() == null) return;
         Notification n = sbn.getNotification();
         Bundle e = n.extras;
         String title = text(e, Notification.EXTRA_TITLE);
-        String text = text(e, Notification.EXTRA_TEXT);
+        String body = text(e, Notification.EXTRA_TEXT);
         String sub = text(e, Notification.EXTRA_SUB_TEXT);
         String info = text(e, Notification.EXTRA_INFO_TEXT);
-
-        // Music players on K706 do not always expose a MediaSession.
-        // Save audio notifications as a bounded metadata fallback.
         String pkg=sbn.getPackageName();
-        if(pkg!=null && !pkg.equals(getPackageName()) && !SourceRouter.isRadioPackage(pkg)
-                && (SourceRouter.isAudioPackage(pkg) || Notification.CATEGORY_TRANSPORT.equals(n.category))) {
-            String candidate=SourceRouter.mediaDisplay(title,text);
-            String upper=title.toUpperCase(java.util.Locale.ROOT);
-            if(!candidate.isEmpty() && !upper.equals("MUSIC") && !upper.equals("MUZYKA")
-                    && !upper.equals("USB") && !upper.equals("MP3")) {
-                getSharedPreferences("krupas_mp3_notification",MODE_PRIVATE).edit()
-                        .putString("pkg",pkg).putString("title",candidate)
-                        .putLong("seen",System.currentTimeMillis()).apply();
-            }
-        }
-        MediaStateStore.save(
-                this,
-                "NOTIFICATION",
-                sbn.getPackageName(),
-                title,
-                text,
-                sub,
-                "posted",
-                "info=" + info + "; category=" + n.category
-        );
+
+        MediaStateStore.save(this,"NOTIFICATION",pkg,title,body,sub,"posted","info=" + info + "; category=" + n.category);
+
+        // Notification is an additional trigger. MediaSession changes are handled directly by MediaBridgeService.
+        if (Notification.CATEGORY_TRANSPORT.equals(n.category) || SourceRouter.isAudioPackage(pkg) || SourceRouter.isRadioPackage(pkg))
+            MediaBridgeService.poke(this,"MEDIA_NOTIFICATION");
     }
 
-    @Override public void onNotificationRemoved(StatusBarNotification sbn) {
-        if(sbn==null)return;
-        android.content.SharedPreferences p=getSharedPreferences("krupas_mp3_notification",MODE_PRIVATE);
-        if(sbn.getPackageName().equals(p.getString("pkg","")))p.edit().remove("title").remove("seen").apply();
+    @Override public void onNotificationRemoved(StatusBarNotification sbn){
+        if(sbn!=null && (SourceRouter.isAudioPackage(sbn.getPackageName())||SourceRouter.isRadioPackage(sbn.getPackageName())))
+            MediaBridgeService.poke(this,"MEDIA_NOTIFICATION_REMOVED");
     }
 
     private static String text(Bundle b, String key) {
