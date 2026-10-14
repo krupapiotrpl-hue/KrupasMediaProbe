@@ -12,9 +12,17 @@ final class SourceRouter {
     static String clean(String v) {
         if (v == null) return "";
         String s = v.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim();
-        if (s.equalsIgnoreCase("unknown") || s.equalsIgnoreCase("<unknown>") ||
-                s.equalsIgnoreCase("null") || s.equalsIgnoreCase("unknown title")) return "";
+        if (isPlaceholder(s)) return "";
         return s.length() > 90 ? s.substring(0, 90) : s;
+    }
+
+    static boolean isPlaceholder(String value) {
+        if (value == null) return true;
+        String s = value.replace('\n',' ').replace('\r',' ').replaceAll("\\s+", " ").trim();
+        if (s.isEmpty()) return true;
+        String u = s.toUpperCase(Locale.ROOT);
+        if (u.matches("^(?:RDS|PS|TITLE|MEDIA|MUSIC|ARTIST|FM|RADIO)?\\s*[:=]?\\s*(?:NONE|TODO|UNKNOWN|NULL|UNDEFINED|NO RDS|N/A|BRAK DANYCH|NO DATA|<UNKNOWN>|<NONE>)$")) return true;
+        return u.equals("PAUSED") || u.equals("PAUSE") || u.equals("STOPPED");
     }
 
     static String frequency(String source) {
@@ -41,22 +49,22 @@ final class SourceRouter {
         String p = pkg.toLowerCase(Locale.ROOT);
         return p.contains("music") || p.contains("audio") || p.contains("player") ||
                 p.contains("spotify") || p.contains("youtube") || p.contains("poweramp") ||
-                p.contains("vlc") || p.contains("audiobook");
+                p.contains("vlc") || p.contains("audiobook") || p.contains("podcast");
     }
 
     static boolean validStation(String s) {
         s = clean(s);
-        if (s.length() < 3 || s.length() > 34 || frequency(s).length() > 0) return false;
+        if (s.length() < 2 || s.length() > 34 || frequency(s).length() > 0 || isPlaceholder(s)) return false;
         String u = s.toUpperCase(Locale.ROOT);
         if (!u.matches(".*[\\p{L}].*")) return false;
         if (u.equals("RADIO") || u.equals("FM") || u.equals("RADIO FM") || u.equals("FM RADIO")) return false;
-        if (u.matches(".*\\b(?:AM|MHz|RDS|BAND|SCAN|EQ|STEREO|MONO|PTY|ST|LOC|DX|NEXT|PREV|SETTINGS|HOME|MENU|MP3|USB|BT|PLAY|PAUSE|STOP|MUTE|AUTO|SEARCH)\\b.*") && u.length() < 13) return false;
+        if (u.matches(".*\\b(?:AM|MHZ|RDS|BAND|SCAN|EQ|STEREO|MONO|PTY|ST|LOC|DX|NEXT|PREV|SETTINGS|HOME|MENU|MP3|USB|BT|PLAY|PAUSE|STOP|MUTE|AUTO|SEARCH)\\b.*") && u.length() < 16) return false;
         if (u.contains("USTAWIEN") || u.contains("CZĘSTOTLIW") || u.contains("PRZEŁĄCZ") ||
                 u.contains("GŁOŚNO") || u.contains("POPRZEDNI") || u.contains("NASTĘPNY") ||
-                u.contains("PRESET") || u.contains("EQUALIZER")) return false;
+                u.contains("PRESET") || u.contains("EQUALIZER") || u.contains("BLUETOOTH")) return false;
         int letters = 0, digits = 0;
         for (int i=0;i<s.length();i++) { if(Character.isLetter(s.charAt(i)))letters++; if(Character.isDigit(s.charAt(i)))digits++; }
-        return letters >= 3 && digits < letters;
+        return letters >= 2 && digits < Math.max(3, letters);
     }
 
     static String mediaDisplay(String title, String artist) {
