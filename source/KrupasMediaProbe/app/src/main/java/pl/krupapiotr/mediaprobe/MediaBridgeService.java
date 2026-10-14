@@ -18,6 +18,7 @@ import android.os.Looper;
  */
 public final class MediaBridgeService extends Service {
     static final String ACTION_TEST_FM="pl.krupapiotr.mediaprobe.TEST_FM";
+    static final String ACTION_RESTART_BLE="pl.krupapiotr.mediaprobe.RESTART_BLE";
 
     private final Handler h = new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
@@ -46,7 +47,9 @@ public final class MediaBridgeService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_TEST_FM.equals(intent.getAction())) {
+        if (intent != null && ACTION_RESTART_BLE.equals(intent.getAction())) {
+            if (ble != null) ble.restart();
+        } else if (intent != null && ACTION_TEST_FM.equals(intent.getAction())) {
             sendFrame("FM:FM 107.0", "TEST_FM");
             sendFrame("RDS:TEST FM", "TEST_RDS");
         }
