@@ -196,7 +196,7 @@ final class BleDisplayClient {
                 ok=gatt.writeCharacteristic(write);
             }
             if(!ok){busy=false;fail("BLE WRITE FALSE");return;}
-            context.getSharedPreferences("krupas_diag",0).edit().putString("last_tx",queue.peekFirst()).apply();
+            context.getSharedPreferences("krupas_diag",0).edit().putString("last_tx",queue.peekFirst()).putLong("last_tx_time",System.currentTimeMillis()).apply();
             if(writeType==BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE){
                 final BluetoothGatt sentOn=gatt;
                 h.postDelayed(()->{
