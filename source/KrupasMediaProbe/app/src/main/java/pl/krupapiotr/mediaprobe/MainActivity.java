@@ -38,7 +38,7 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
 
         TextView heading = new TextView(this);
-        heading.setText("KRUPAS MEDIA PRO 3.0 DIAG-2 • K706");
+        heading.setText("KRUPAS MEDIA PRO 3.1 • K706");
         heading.setTextSize(20);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(heading);
