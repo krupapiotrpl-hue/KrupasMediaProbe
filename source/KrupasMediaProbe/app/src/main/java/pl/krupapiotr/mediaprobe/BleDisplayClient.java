@@ -47,6 +47,22 @@ final class BleDisplayClient {
     BleDisplayClient(Context c,Runnable onReady) {context=c.getApplicationContext();notifyReady=onReady;}
     String status(){return status;}
     boolean ready(){return ready;}
+    void restart(){
+        if(running){
+            cancelTasks();
+            stopScan();
+            cleanup();
+            failures=0;
+            attempt();
+        }else{
+            start();
+        }
+    }
+    private static boolean nameMatches(String n){
+        if(n==null)return false;
+        String x=n.trim().replace("-","").replace(" ","");
+        return "ZAFIRADISPLAY".equalsIgnoreCase(x);
+    }
 
     private boolean has(String permission){return Build.VERSION.SDK_INT<23||context.checkSelfPermission(permission)==PackageManager.PERMISSION_GRANTED;}
     private boolean permitted(){
