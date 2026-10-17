@@ -59,6 +59,30 @@ final class SourceRouter {
         return letters >= 3 && digits < letters;
     }
 
+    static boolean isBluetoothPackage(String pkg) {
+        if (pkg == null) return false;
+        String p = pkg.toLowerCase(Locale.ROOT);
+        return p.contains("bluetooth") || p.contains("btmusic") ||
+                p.contains("btplayer") || p.contains("a2dp") || p.contains("bt_audio");
+    }
+
+    static String radioDisplay(String station, String freq) {
+        String s = clean(station);
+        if (s.isEmpty() && !clean(freq).isEmpty()) s = "FM " + clean(freq);
+        if (s.isEmpty()) return "";
+        s = s.toUpperCase(Locale.ROOT);
+        return s.startsWith("RADIO ") ? s : "RADIO " + s;
+    }
+
+    static String mediaDisplayForSource(String pkg, String title) {
+        String t = clean(title);
+        if (t.isEmpty()) return "";
+        String p = pkg == null ? "" : pkg.toLowerCase(Locale.ROOT);
+        if (isBluetoothPackage(pkg)) return "TELEFON";
+        if (p.contains("youtube")) return t;
+        return t.toUpperCase(Locale.ROOT).startsWith("MP3 ") ? t : "MP3 " + t;
+    }
+
     static String mediaDisplay(String title, String artist) {
         String t = clean(title), a = clean(artist);
         if (t.isEmpty()) return "";

@@ -30,8 +30,7 @@ public final class MediaBridgeService extends Service {
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
     private boolean registered;
-    private String oldMedia="",oldFreq="",oldStation="";
-    private long sentMedia, sentRadio, sentStation;
+    private String lastDisplay = null;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
         h.postDelayed(this,1500);
@@ -41,7 +40,7 @@ public final class MediaBridgeService extends Service {
         super.onCreate();
         foreground();
         ble=new BleDisplayClient(this,()->{
-            oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            lastDisplay=null;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
@@ -50,9 +49,9 @@ public final class MediaBridgeService extends Service {
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
         if(intent!=null && ACTION_TEST_FM.equals(intent.getAction())){
-            ble.send("FM:107.0"); ble.send("RDS:TEST FM");
+            ble.send("RADIO RMF FM");
         }
-        if(intent!=null && ACTION_TEST_MP3.equals(intent.getAction())) ble.send("TITLE:KRUPAS TEST MP3");
+        if(intent!=null && ACTION_TEST_MP3.equals(intent.getAction())) ble.send("MP3 KRUPAS TEST MP3");
         return START_STICKY;
     }
     @Override public void onDestroy(){
@@ -112,70 +111,24 @@ public final class MediaBridgeService extends Service {
         diag("route", preferRadio ? "OEM FM/RDS" :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
 
-        // Do not update cached sent values while BLE is disconnected.
-        // After reconnection the ready callback resets all caches.
+        // ESP 1.9d CLEAR expects plain UTF-8 text, not FM:/RDS:/TITLE: tags.
+        // Send changes only; repeated identical titles must not restart scrolling.
+        final String display;
+        if (preferRadio) {
+            display = SourceRouter.radioDisplay(station, freq);
+        } else if (!media.title.isEmpty()) {
+            display = SourceRouter.mediaDisplayForSource(media.pkg, media.title);
+        } else {
+            display = "";
+        }
+        diag("display", display.isEmpty() ? "(CLEAR)" : display);
         if (!ble.ready()) return;
 
-        if (preferRadio) {
-            if (!oldMedia.isEmpty()) {
-                ble.send("MEDIA:STOP");
-                oldMedia = "";
-                sentMedia = 0;
-            }
-
-            final boolean frequencyChanged = !freq.equals(oldFreq);
-            final boolean stationChanged = !station.equals(oldStation);
-
-            if (frequencyChanged && !oldFreq.isEmpty()) {
-                // Invalidate previous station only on actual retuning.
-                ble.send("CLEAR:RDS");
-                oldStation = "";
-            }
-            if (!freq.isEmpty() && (frequencyChanged || now - sentRadio >= 10000)) {
-                ble.send("FM:FM " + freq);
-                oldFreq = freq;
-                sentRadio = now;
-            } else if (freq.isEmpty() && !oldFreq.isEmpty()) {
-                ble.send("CLEAR:FM");
-                oldFreq = "";
-            }
-
-            if (!station.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
-                ble.send("RDS:" + station);
-                oldStation = station;
-                sentStation = now;
-            } else if (station.isEmpty() && !oldStation.isEmpty()) {
-                ble.send("CLEAR:RDS");
-                oldStation = "";
-            }
-        }
-        else if (!media.title.isEmpty()) {
-            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
-                ble.send("CLEAR:FM");
-                ble.send("CLEAR:RDS");
-                oldFreq = "";
-                oldStation = "";
-                sentRadio = sentStation = 0;
-            }
-            if (!media.title.equals(oldMedia) || now - sentMedia >= 10000) {
-                ble.send("TITLE:" + media.title);
-                oldMedia = media.title;
-                sentMedia = now;
-            }
-        }
-        else {
-            // Stop immediately once all live music sources have disappeared.
-            if (!oldMedia.isEmpty()) {
-                ble.send("MEDIA:STOP");
-                oldMedia = "";
-                sentMedia = 0;
-            }
-            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
-                ble.send("CLEAR:FM");
-                ble.send("CLEAR:RDS");
-                oldFreq = oldStation = "";
-                sentRadio = sentStation = 0;
-            }
+        // null forces a refresh after every successful BLE reconnection,
+        // even when there are no active media sources.
+        if (!display.equals(lastDisplay)) {
+            ble.send(display.isEmpty() ? "CLEAR" : display);
+            lastDisplay = display;
         }
     }
     private MediaResult findPlayingMedia(){
@@ -193,6 +146,7 @@ public final class MediaBridgeService extends Service {
                 MediaMetadata m=c.getMetadata();
                 String title=m==null?"":SourceRouter.mediaDisplay(str(m.getText(MediaMetadata.METADATA_KEY_TITLE)),str(m.getText(MediaMetadata.METADATA_KEY_ARTIST)));
                 if(title.isEmpty()&&m!=null)title=SourceRouter.clean(str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)));
+                if(title.isEmpty() && SourceRouter.isBluetoothPackage(pkg))title="TELEFON";
                 if(title.isEmpty())continue;
                 MediaResult candidate=new MediaResult();candidate.pkg=pkg;candidate.title=title;candidate.state="PLAYING";
                 if(best.title.isEmpty() || (SourceRouter.isAudioPackage(pkg)&&!SourceRouter.isAudioPackage(best.pkg)))best=candidate;
