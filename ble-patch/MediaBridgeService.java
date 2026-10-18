@@ -122,6 +122,10 @@ public class MediaBridgeService extends Service {
 
             String title = meta(metadata, MediaMetadata.METADATA_KEY_TITLE);
             if (title.isEmpty()) continue;
+            // Paused/stopped sessions must not overwrite the foreground radio.
+            if (state == null || (state.getState() != PlaybackState.STATE_PLAYING
+                    && state.getState() != PlaybackState.STATE_BUFFERING
+                    && state.getState() != PlaybackState.STATE_CONNECTING)) continue;
 
             long score = score(state);
 
@@ -144,6 +148,10 @@ public class MediaBridgeService extends Service {
 
         String title =
                 meta(bestMetadata, MediaMetadata.METADATA_KEY_TITLE);
+        if (best.getPackageName().equals(RdsAccessibilityService.stationPackage)
+                && !RdsAccessibilityService.stationTitle.isEmpty()) {
+            title = RdsAccessibilityService.stationTitle;
+        }
 
         String artist =
                 meta(bestMetadata, MediaMetadata.METADATA_KEY_ARTIST);
@@ -270,7 +278,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("KRUPAS MEDIA 0.6")
+                .setContentTitle("KRUPAS MEDIA 0.6.1 TEST")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)
@@ -290,3 +298,4 @@ public class MediaBridgeService extends Service {
         }
     }
 }
+

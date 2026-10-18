@@ -1,7 +1,7 @@
-name: Zbuduj instalator APK 0.6 AUTO
+name: Zbuduj instalator APK 0.6.1 TEST
 on:
   push:
-    branches: [ble-0.2]
+    branches: [fix/0.6-display-stability]
   workflow_dispatch:
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw KRUPAS MEDIA 0.6 AUTO
+      - name: Wstaw KRUPAS MEDIA 0.6.1 TEST
         run: |
           cp ble-patch/BleDisplayClient.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/BleDisplayClient.java
           cp ble-patch/MainActivity.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MainActivity.java
@@ -54,10 +54,11 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6-AUTO.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.1-TEST.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.6-AUTO
-          path: KRUPAS-Media-Probe-0.6-AUTO.apk
+          name: KRUPAS-Media-Probe-0.6.1-TEST
+          path: KRUPAS-Media-Probe-0.6.1-TEST.apk
           if-no-files-found: error
+

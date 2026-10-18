@@ -46,6 +46,15 @@ final class BleDisplayClient {
     private long gattStartedAt;
     private String pending = "";
     private String lastSent = "";
+    private String inFlight = "";
+    private int maxWriteBytes = 20;
+    private final Runnable writeTimeout = () -> {
+        BluetoothGatt stalled;
+        synchronized (BleDisplayClient.this) {
+            stalled = inFlight.isEmpty() ? null : gatt;
+        }
+        if (stalled != null) reconnect(stalled);
+    };
 
     private BleDisplayClient(Context context) {
         this.context = context;
@@ -162,7 +171,7 @@ final class BleDisplayClient {
                 if (newState == BluetoothProfile.STATE_CONNECTED
                         && status == BluetoothGatt.GATT_SUCCESS) {
                     connected = true;
-                    gattStartedAt = 0;
+                    gattStartedAt = SystemClock.elapsedRealtime();
                     lastSent = "";
                 } else {
                     connected = false;
@@ -178,7 +187,7 @@ final class BleDisplayClient {
 
             if (Build.VERSION.SDK_INT >= 21) {
                 try {
-                    mtuRequested = callbackGatt.requestMtu(185);
+                    mtuRequested = callbackGatt.requestMtu(517);
                 } catch (Throwable ignored) {}
             }
 
@@ -196,6 +205,10 @@ final class BleDisplayClient {
                 int mtu,
                 int status
         ) {
+            synchronized (BleDisplayClient.this) {
+                if (gatt != callbackGatt) return;
+                maxWriteBytes = status == BluetoothGatt.GATT_SUCCESS ? Math.max(20, mtu - 3) : 20;
+            }
             try {
                 callbackGatt.discoverServices();
             } catch (Throwable ignored) {
@@ -230,11 +243,24 @@ final class BleDisplayClient {
             synchronized (BleDisplayClient.this) {
                 if (gatt != callbackGatt) return;
                 rx = characteristic;
-                rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                gattStartedAt = 0;
+                rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
                 lastSent = "";
             }
 
             writePending();
+        }
+
+        @Override public void onCharacteristicWrite(BluetoothGatt callbackGatt,
+                BluetoothGattCharacteristic characteristic, int status) {
+            synchronized (BleDisplayClient.this) {
+                if (gatt != callbackGatt || rx != characteristic || inFlight.isEmpty()) return;
+                handler.removeCallbacks(writeTimeout);
+                if (status == BluetoothGatt.GATT_SUCCESS) lastSent = inFlight;
+                inFlight = "";
+            }
+            if (status == BluetoothGatt.GATT_SUCCESS) handler.post(BleDisplayClient.this::writePending);
+            else reconnect(callbackGatt);
         }
     };
 
@@ -282,34 +308,34 @@ final class BleDisplayClient {
                 }
             };
 
-    private void writePending() {
-        final BluetoothGatt currentGatt;
-        final BluetoothGattCharacteristic currentRx;
-        final String value;
-
-        synchronized (this) {
-            currentGatt = gatt;
-            currentRx = rx;
-            value = pending;
+    private synchronized void writePending() {
+        if (!hasPermissions() || gatt == null || rx == null || !inFlight.isEmpty()) return;
+        if (pending.isEmpty() || pending.equals(lastSent)) return;
+        byte[] bytes = pending.getBytes(StandardCharsets.UTF_8);
+        // The ESP treats each BLE write as a complete title. Never split a title
+        // into independent writes or silently drop its first/last characters.
+        if (bytes.length > maxWriteBytes) {
+            android.util.Log.w("KrupasBLE", "Title exceeds negotiated MTU; retaining full title");
+            return;
         }
-
-        if (!hasPermissions() || currentGatt == null || currentRx == null) return;
-        if (value.isEmpty() || value.equals(lastSent)) return;
-
         try {
-            currentRx.setValue(value.getBytes(StandardCharsets.UTF_8));
-
-            if (currentGatt.writeCharacteristic(currentRx)) {
-                synchronized (this) {
-                    lastSent = value;
-                }
+            inFlight = pending;
+            rx.setValue(bytes);
+            if (gatt.writeCharacteristic(rx)) {
+                handler.removeCallbacks(writeTimeout);
+                handler.postDelayed(writeTimeout, 5000);
+            } else {
+                inFlight = "";
+                handler.postDelayed(this::writePending, 350);
             }
         } catch (Throwable ignored) {
-            reconnect(currentGatt);
+            reconnect(gatt);
         }
     }
-
     private void closeCurrentGattLocked() {
+        handler.removeCallbacks(writeTimeout);
+        inFlight = "";
+        maxWriteBytes = 20;
         BluetoothGatt current = gatt;
 
         gatt = null;
@@ -326,6 +352,9 @@ final class BleDisplayClient {
 
     private void closeGattLocked(BluetoothGatt target) {
         if (gatt == target) {
+            handler.removeCallbacks(writeTimeout);
+            inFlight = "";
+            maxWriteBytes = 20;
             gatt = null;
             rx = null;
             connected = false;
@@ -377,3 +406,4 @@ final class BleDisplayClient {
         return result;
     }
 }
+

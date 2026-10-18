@@ -12,6 +12,8 @@ import java.util.Set;
 public class RdsAccessibilityService extends AccessibilityService {
     private BleDisplayClient ble;
     private String lastSent = "";
+    static String stationPackage = "";
+    static String stationTitle = "";
 
     @Override public void onServiceConnected() {
         super.onServiceConnected();
@@ -67,6 +69,11 @@ public class RdsAccessibilityService extends AccessibilityService {
         String pkg = pkgCs == null ? "" : pkgCs.toString();
 
         if (pkg.equals(getPackageName())) return;
+        // Only radio packages supply RDS. System overlays remain native CAN
+        // messages; they are not media titles and are not blocked by this APK.
+        String lowerPackage = pkg.toLowerCase(Locale.ROOT);
+        if (!lowerPackage.contains("radio") && !lowerPackage.contains(".fm")) return;
+        if (otherMediaPlaying(pkg)) return;
 
         AccessibilityNodeInfo root = null;
 
@@ -81,6 +88,11 @@ public class RdsAccessibilityService extends AccessibilityService {
         }
 
         if (root == null) return;
+        CharSequence rootPackage = root.getPackageName();
+        if (rootPackage == null || !pkg.contentEquals(rootPackage)) {
+            root.recycle();
+            return;
+        }
 
         Set<String> texts = new LinkedHashSet<>();
 
@@ -88,11 +100,18 @@ public class RdsAccessibilityService extends AccessibilityService {
             collect(root, texts, 0);
         } catch (Throwable ignored) {
             return;
+        } finally {
+            root.recycle();
         }
 
         String best = chooseBestRadioCandidate(texts);
 
-        if (!best.isEmpty() && !best.equals(lastSent)) {
+        if (!best.isEmpty()) {
+            stationPackage = pkg;
+            stationTitle = best;
+        }
+        if (ble == null) ble = BleDisplayClient.get(this);
+        if (!best.isEmpty() && !best.equals(ble.getPendingText())) {
             lastSent = best;
 
             MediaStateStore.save(
@@ -116,6 +135,29 @@ public class RdsAccessibilityService extends AccessibilityService {
     @Override public void onInterrupt() {
         if (ble == null) ble = BleDisplayClient.get(this);
         ble.start();
+    }
+
+    private boolean otherMediaPlaying(String radioPackage) {
+        try {
+            android.media.session.MediaSessionManager manager =
+                    (android.media.session.MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
+            if (manager == null) return false;
+            java.util.List<android.media.session.MediaController> sessions = manager.getActiveSessions(
+                    new android.content.ComponentName(this, MediaProbeNotificationService.class));
+            if (sessions == null) return false;
+            for (android.media.session.MediaController controller : sessions) {
+                if (controller == null || radioPackage.equals(controller.getPackageName())) continue;
+                android.media.session.PlaybackState state = controller.getPlaybackState();
+                if (state == null) continue;
+                int value = state.getState();
+                if (value == android.media.session.PlaybackState.STATE_PLAYING
+                        || value == android.media.session.PlaybackState.STATE_BUFFERING
+                        || value == android.media.session.PlaybackState.STATE_CONNECTING) return true;
+            }
+        } catch (SecurityException ignored) {
+            // With no notification access the original visible RDS reader still works.
+        }
+        return false;
     }
 
     private void collect(
@@ -297,3 +339,4 @@ public class RdsAccessibilityService extends AccessibilityService {
         return result;
     }
 }
+
