@@ -1,0 +1,28 @@
+name: Export APK 0.6.2 for local delivery
+on:
+  push:
+    branches: [delivery/0.6.2-apk]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: KRUPAS-Media-Probe-0.6.2-TEST
+          run-id: 39169702206
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: apk
+      - name: Export verified APK bytes
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, pathlib
+          p = next(pathlib.Path('apk').glob('*.apk'))
+          data = p.read_bytes()
+          print('APK_SHA256:' + hashlib.sha256(data).hexdigest())
+          encoded = base64.b64encode(data).decode('ascii')
+          for offset in range(0, len(encoded), 4000):
+              print('APK_DATA:' + encoded[offset:offset+4000])
+          PY
