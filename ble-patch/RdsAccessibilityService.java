@@ -11,12 +11,13 @@ import java.util.Set;
 
 public class RdsAccessibilityService extends AccessibilityService {
     private BleDisplayClient ble;
-    private String lastSent = "";
+    private static RdsAccessibilityService instance;
     static String stationPackage = "";
     static String stationTitle = "";
 
     @Override public void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
 
         try {
             AccessibilityServiceInfo info = getServiceInfo();
@@ -51,115 +52,53 @@ public class RdsAccessibilityService extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        try {
-            handleAccessibilityEvent(event);
-        } catch (Throwable ignored) {
-            // Na niektorych ROM-ach K706 pojedynczy uszkodzony/recyklingowany
-            // AccessibilityNodeInfo potrafi rzucic wyjatek. Nie pozwalamy,
-            // aby taki przypadek zabil caly KRUPAS RDS Reader.
-            if (ble == null) ble = BleDisplayClient.get(this);
-            ble.start();
-        }
+        // MediaBridgeService is the single writer. It samples the actual active
+        // window every second, including when a radio sends no new UI events.
     }
 
-    private void handleAccessibilityEvent(AccessibilityEvent event) {
-        if (event == null) return;
+    @Override public void onInterrupt() { resetStation(); }
 
-        CharSequence pkgCs = event.getPackageName();
-        String pkg = pkgCs == null ? "" : pkgCs.toString();
+    @Override public void onDestroy() {
+        if (instance == this) instance = null;
+        resetStation();
+        super.onDestroy();
+    }
 
-        if (pkg.equals(getPackageName())) return;
-        // Only radio packages supply RDS. System overlays remain native CAN
-        // messages; they are not media titles and are not blocked by this APK.
-        String lowerPackage = pkg.toLowerCase(Locale.ROOT);
-        if (!lowerPackage.contains("radio") && !lowerPackage.contains(".fm")) return;
-        if (otherMediaPlaying(pkg)) return;
+    private static void resetStation() {
+        stationPackage = "";
+        stationTitle = "";
+    }
 
+    static String readVisibleStation() {
+        if (instance == null) { resetStation(); return ""; }
         AccessibilityNodeInfo root = null;
-
         try {
-            root = getRootInActiveWindow();
-        } catch (Throwable ignored) {}
-
-        if (root == null) {
-            try {
-                root = event.getSource();
-            } catch (Throwable ignored) {}
-        }
-
-        if (root == null) return;
-        CharSequence rootPackage = root.getPackageName();
-        if (rootPackage == null || !pkg.contentEquals(rootPackage)) {
-            root.recycle();
-            return;
-        }
-
-        Set<String> texts = new LinkedHashSet<>();
-
-        try {
-            collect(root, texts, 0);
-        } catch (Throwable ignored) {
-            return;
-        } finally {
-            root.recycle();
-        }
-
-        String best = chooseBestRadioCandidate(texts);
-
-        if (!best.isEmpty()) {
-            stationPackage = pkg;
-            stationTitle = best;
-        }
-        if (ble == null) ble = BleDisplayClient.get(this);
-        if (!best.isEmpty() && !best.equals(ble.getPendingText())) {
-            lastSent = best;
-
-            MediaStateStore.save(
-                    this,
-                    "RDS_ACCESSIBILITY",
-                    pkg,
-                    best,
-                    "",
-                    "",
-                    "VISIBLE",
-                    "filtered-radio-candidate"
-            );
-
-            if (ble == null) ble = BleDisplayClient.get(this);
-
-            ble.start();
-            ble.sendText(best);
-        }
-    }
-
-    @Override public void onInterrupt() {
-        if (ble == null) ble = BleDisplayClient.get(this);
-        ble.start();
-    }
-
-    private boolean otherMediaPlaying(String radioPackage) {
-        try {
-            android.media.session.MediaSessionManager manager =
-                    (android.media.session.MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
-            if (manager == null) return false;
-            java.util.List<android.media.session.MediaController> sessions = manager.getActiveSessions(
-                    new android.content.ComponentName(this, MediaProbeNotificationService.class));
-            if (sessions == null) return false;
-            for (android.media.session.MediaController controller : sessions) {
-                if (controller == null || radioPackage.equals(controller.getPackageName())) continue;
-                android.media.session.PlaybackState state = controller.getPlaybackState();
-                if (state == null) continue;
-                int value = state.getState();
-                if (value == android.media.session.PlaybackState.STATE_PLAYING
-                        || value == android.media.session.PlaybackState.STATE_BUFFERING
-                        || value == android.media.session.PlaybackState.STATE_CONNECTING) return true;
+            root = instance.getRootInActiveWindow();
+            if (root == null || root.getPackageName() == null) { resetStation(); return ""; }
+            String pkg = root.getPackageName().toString();
+            String lower = pkg.toLowerCase(Locale.ROOT);
+            // A system overlay is not evidence that the radio closed; the lease
+            // tolerates a brief absence without renewing an unobserved source.
+            if (lower.equals("com.android.systemui")) return "";
+            if (!lower.contains("radio") && !lower.contains(".fm")) {
+                resetStation();
+                return "";
             }
-        } catch (SecurityException ignored) {
-            // With no notification access the original visible RDS reader still works.
+            if (!pkg.equals(stationPackage)) resetStation();
+            stationPackage = pkg;
+            Set<String> texts = new LinkedHashSet<>();
+            instance.collect(root, texts, 0);
+            String candidate = instance.chooseBestRadioCandidate(texts);
+            if (!candidate.isEmpty()) stationTitle = candidate;
+            // Retain RDS through frequency-only updates, but only while the same
+            // radio window is actually present. Never fall back to an old event.
+            return stationTitle;
+        } catch (Throwable ignored) {
+            return "";
+        } finally {
+            if (root != null) try { root.recycle(); } catch (Throwable ignored) {}
         }
-        return false;
     }
-
     private void collect(
             AccessibilityNodeInfo node,
             Set<String> out,

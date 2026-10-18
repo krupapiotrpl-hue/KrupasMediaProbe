@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 28
-        versionCode 61
-        versionName '0.6.1-TEST'
+        versionCode 62
+        versionName '0.6.2-TEST'
     }
 
     buildTypes {

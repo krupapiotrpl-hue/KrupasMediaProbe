@@ -26,7 +26,7 @@ public class MediaBridgeService extends Service {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
-    private String lastTitle = "";
+    private final DisplayLease displayLease = new DisplayLease();
 
     static void start(Context context) {
         Intent i = new Intent(context, MediaBridgeService.class);
@@ -41,7 +41,7 @@ public class MediaBridgeService extends Service {
         @Override public void run() {
             try {
                 pollAndSend();
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) { publishCandidate(""); }
 
             if (ble != null) ble.start();
             handler.postDelayed(this, POLL_MS);
@@ -83,108 +83,65 @@ public class MediaBridgeService extends Service {
     }
 
     private void pollAndSend() {
-        MediaSessionManager msm =
+        String visibleStation = RdsAccessibilityService.readVisibleStation();
+        String radioPackage = RdsAccessibilityService.stationPackage;
+        MediaSessionManager manager =
                 (MediaSessionManager) getSystemService(Context.MEDIA_SESSION_SERVICE);
-
-        if (msm == null) return;
-
-        ComponentName listener =
-                new ComponentName(this, MediaProbeNotificationService.class);
-
-        List<MediaController> sessions;
-
+        List<MediaController> sessions = null;
         try {
-            sessions = msm.getActiveSessions(listener);
-        } catch (SecurityException ex) {
-            updateNotification("Włącz dostęp do powiadomień");
-            return;
-        }
-
-        if (sessions == null || sessions.isEmpty()) {
-            updateNotification(
-                    ble != null && ble.isConnected()
-                            ? "BLE połączone — brak aktywnej sesji"
-                            : "Szukam ZAFIRA-DISPLAY"
-            );
-            return;
+            if (manager != null) sessions = manager.getActiveSessions(
+                    new ComponentName(this, MediaProbeNotificationService.class));
+        } catch (SecurityException ignored) {
+            // A visible radio without MediaSession can still supply RDS.
         }
 
         MediaController best = null;
-        MediaMetadata bestMetadata = null;
-        PlaybackState bestState = null;
         long bestScore = Long.MIN_VALUE;
-
-        for (MediaController controller : sessions) {
+        boolean visibleRadioStopped = false;
+        if (sessions != null) for (MediaController controller : sessions) {
             if (controller == null) continue;
-
-            MediaMetadata metadata = controller.getMetadata();
             PlaybackState state = controller.getPlaybackState();
-
-            String title = meta(metadata, MediaMetadata.METADATA_KEY_TITLE);
-            if (title.isEmpty()) continue;
-            // Paused/stopped sessions must not overwrite the foreground radio.
-            if (state == null || (state.getState() != PlaybackState.STATE_PLAYING
-                    && state.getState() != PlaybackState.STATE_BUFFERING
-                    && state.getState() != PlaybackState.STATE_CONNECTING)) continue;
-
-            long score = score(state);
-
-            if (score > bestScore) {
-                bestScore = score;
+            if (state == null) continue;
+            int value = state.getState();
+            boolean active = value == PlaybackState.STATE_PLAYING
+                    || value == PlaybackState.STATE_BUFFERING
+                    || value == PlaybackState.STATE_CONNECTING;
+            if (!active) {
+                if (controller.getPackageName().equals(radioPackage)) visibleRadioStopped = true;
+                continue;
+            }
+            long candidateScore = score(state);
+            if (candidateScore > bestScore) {
                 best = controller;
-                bestMetadata = metadata;
-                bestState = state;
+                bestScore = candidateScore;
             }
         }
 
-        if (best == null || bestMetadata == null) {
-            updateNotification(
-                    ble != null && ble.isConnected()
-                            ? "BLE połączone — czekam na TITLE"
-                            : "Szukam ZAFIRA-DISPLAY"
-            );
-            return;
+        String candidate = "";
+        if (best != null) {
+            candidate = meta(best.getMetadata(), MediaMetadata.METADATA_KEY_TITLE);
+            if (best.getPackageName().equals(radioPackage) && !visibleStation.isEmpty()) {
+                candidate = visibleStation;
+            }
+        } else if (!visibleRadioStopped) {
+            candidate = visibleStation;
         }
-
-        String title =
-                meta(bestMetadata, MediaMetadata.METADATA_KEY_TITLE);
-        if (best.getPackageName().equals(RdsAccessibilityService.stationPackage)
-                && !RdsAccessibilityService.stationTitle.isEmpty()) {
-            title = RdsAccessibilityService.stationTitle;
-        }
-
-        String artist =
-                meta(bestMetadata, MediaMetadata.METADATA_KEY_ARTIST);
-
-        String album =
-                meta(bestMetadata, MediaMetadata.METADATA_KEY_ALBUM);
-
-        String stateName =
-                bestState == null ? "?" : stateName(bestState.getState());
-
-        MediaStateStore.save(
-                this,
-                "BACKGROUND_MEDIA_SESSION",
-                best.getPackageName(),
-                title,
-                artist,
-                album,
-                stateName,
-                "auto-background"
-        );
-
-        if (ble == null) ble = BleDisplayClient.get(this);
-
-        ble.start();
-        ble.sendText(title);
-
-        lastTitle = title;
-
-        updateNotification(
-                (ble.isConnected() ? "BLE OK — " : "BLE łączenie — ") + title
-        );
+        publishCandidate(candidate);
     }
 
+    private void publishCandidate(String candidate) {
+        if (ble == null) ble = BleDisplayClient.get(this);
+        String current = displayLease.update(candidate, SystemClock.elapsedRealtime());
+        if (current.isEmpty()) {
+            // Replace the pending value too, so reconnect cannot replay a closed app.
+            ble.clearText();
+            updateNotification("Brak aktywnego źródła — tekst wygaszony");
+        } else {
+            // Identical text is a BLE keepalive; the ESP never resets its scroll.
+            ble.sendText(current);
+            updateNotification((ble.isConnected() ? "BLE OK — " : "BLE łączenie — ") + current);
+        }
+    }
     private long score(PlaybackState state) {
         if (state == null) return 0;
 
@@ -278,7 +235,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("KRUPAS MEDIA 0.6.1 TEST")
+                .setContentTitle("KRUPAS MEDIA 0.6.2 TEST")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)

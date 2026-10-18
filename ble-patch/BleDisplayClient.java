@@ -46,6 +46,7 @@ final class BleDisplayClient {
     private long gattStartedAt;
     private String pending = "";
     private String lastSent = "";
+    private long lastConfirmedAt;
     private String inFlight = "";
     private int maxWriteBytes = 20;
     private final Runnable writeTimeout = () -> {
@@ -68,7 +69,7 @@ final class BleDisplayClient {
     }
 
     synchronized String getPendingText() {
-        return pending;
+        return pending.trim();
     }
 
     void start() {
@@ -141,6 +142,14 @@ final class BleDisplayClient {
         } else {
             start();
         }
+    }
+
+    // One ASCII space is an explicit blank title. No printable control command
+    // can accidentally appear on an older ESP firmware.
+    void clearText() {
+        synchronized (this) { pending = " "; }
+        if (isConnected()) writePending();
+        else start();
     }
 
     private void stopScan() {
@@ -256,7 +265,10 @@ final class BleDisplayClient {
             synchronized (BleDisplayClient.this) {
                 if (gatt != callbackGatt || rx != characteristic || inFlight.isEmpty()) return;
                 handler.removeCallbacks(writeTimeout);
-                if (status == BluetoothGatt.GATT_SUCCESS) lastSent = inFlight;
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    lastSent = inFlight;
+                    lastConfirmedAt = SystemClock.elapsedRealtime();
+                }
                 inFlight = "";
             }
             if (status == BluetoothGatt.GATT_SUCCESS) handler.post(BleDisplayClient.this::writePending);
@@ -310,7 +322,9 @@ final class BleDisplayClient {
 
     private synchronized void writePending() {
         if (!hasPermissions() || gatt == null || rx == null || !inFlight.isEmpty()) return;
-        if (pending.isEmpty() || pending.equals(lastSent)) return;
+        if (pending.isEmpty()) return;
+        if (pending.equals(lastSent) && (pending.equals(" ")
+                || SystemClock.elapsedRealtime() - lastConfirmedAt < 2000)) return;
         byte[] bytes = pending.getBytes(StandardCharsets.UTF_8);
         // The ESP treats each BLE write as a complete title. Never split a title
         // into independent writes or silently drop its first/last characters.
