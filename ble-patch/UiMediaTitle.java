@@ -9,7 +9,7 @@ final class UiMediaTitle {
     static String radio(List<Field> fields) {
         java.util.ArrayList<String> values = new java.util.ArrayList<>();
         for (Field f : fields) {
-            if (f.list || f.control || !f.id.matches(".*(rds|station_name|program_service|radio_text|radiotext|/ps$|/rt$).*")) continue;
+            if (f.list || f.control || f.id.contains("preset") || !f.id.matches(".*(rds|station_name|program_service|radio_text|radiotext|/ps$|/rt$|/tv_ps$|/tv_rt$).*")) continue;
             values.add(f.text);
         }
         return RdsText.join(values.toArray(new String[0]));

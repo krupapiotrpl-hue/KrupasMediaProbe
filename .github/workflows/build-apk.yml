@@ -1,7 +1,7 @@
-name: Zbuduj instalator APK 0.6.4 TEST
+name: Zbuduj instalator APK 0.6.5 TEST
 on:
   push:
-    branches: [fix/0.6.4-auto-mp3-fix]
+    branches: [fix/0.6.5-rds-placeholders]
   workflow_dispatch:
 
 permissions:
@@ -27,7 +27,8 @@ jobs:
       - name: Test source expiry lifecycle
         run: |
           mkdir -p test-classes
-          javac -d test-classes ble-patch/DisplayLease.java ble-patch/MediaTitles.java ble-patch/SourceSelector.java tests/DisplayLeaseTest.java tests/MediaSourcesTest.java ble-patch/UiMediaTitle.java ble-patch/RdsText.java ble-patch/BlePayload.java tests/UiAndBleTest.java
+          javac -d test-classes ble-patch/DisplayLease.java ble-patch/MediaTitles.java ble-patch/SourceSelector.java tests/DisplayLeaseTest.java tests/MediaSourcesTest.java ble-patch/UiMediaTitle.java ble-patch/RdsText.java ble-patch/BlePayload.java tests/UiAndBleTest.java ble-patch/StableTitle.java tests/StableTitleTest.java
+          java -cp test-classes pl.krupapiotr.mediaprobe.StableTitleTest
           java -cp test-classes pl.krupapiotr.mediaprobe.UiAndBleTest
           java -cp test-classes pl.krupapiotr.mediaprobe.MediaSourcesTest
           java -cp test-classes pl.krupapiotr.mediaprobe.DisplayLeaseTest
@@ -41,8 +42,9 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw KRUPAS MEDIA 0.6.4 TEST
+      - name: Wstaw KRUPAS MEDIA 0.6.5 TEST
         run: |
+          cp ble-patch/StableTitle.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
           cp ble-patch/RdsText.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
           cp ble-patch/UiMediaTitle.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
           cp ble-patch/BlePayload.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
@@ -70,12 +72,12 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.4-AUTO-MP3-FIX.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.5-AUTO-MP3-FIX.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.6.4-AUTO-MP3-FIX
-          path: KRUPAS-Media-Probe-0.6.4-AUTO-MP3-FIX.apk
+          name: KRUPAS-Media-Probe-0.6.5-AUTO-MP3-FIX
+          path: KRUPAS-Media-Probe-0.6.5-AUTO-MP3-FIX.apk
           if-no-files-found: error
 
   firmware:

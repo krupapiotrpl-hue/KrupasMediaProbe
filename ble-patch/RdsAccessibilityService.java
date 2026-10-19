@@ -18,6 +18,7 @@ public class RdsAccessibilityService extends AccessibilityService {
     static String stationTitle = "";
     private static String lastUiPackage = "", lastUiTitle = "";
     private static long lastUiAt;
+    private static final StableTitle stableMedia = new StableTitle();
     static String diagnostic = "Brak odczytu ekranu od uruchomienia";
 
     static String titleFor(String pkg) {
@@ -110,11 +111,12 @@ public class RdsAccessibilityService extends AccessibilityService {
                 diagnostic = dump.toString();
                 if (radio) labelledStation = UiMediaTitle.radio(fields);
                 if (!radio) {
-                    mediaTitle = UiMediaTitle.choose(fields);
+                    mediaTitle = stableMedia.update(pkg, UiMediaTitle.choose(fields), android.os.SystemClock.elapsedRealtime());
                     lastUiPackage = pkg; lastUiTitle = mediaTitle;
                     lastUiAt = android.os.SystemClock.elapsedRealtime();
                 }
             }
+            if (!MediaTitles.factory(pkg)) stableMedia.update(pkg, "", android.os.SystemClock.elapsedRealtime());
             // A system overlay is not evidence that the radio closed; the lease
             // tolerates a brief absence without renewing an unobserved source.
             if (lower.equals("com.android.systemui")) return "";
@@ -126,7 +128,9 @@ public class RdsAccessibilityService extends AccessibilityService {
             stationPackage = pkg;
             Set<String> texts = new LinkedHashSet<>();
             instance.collect(root, texts, 0);
-            String candidate = labelledStation.isEmpty() ? instance.chooseBestRadioCandidate(texts) : labelledStation;
+            // Preset names are not evidence of the tuned station. Only explicitly
+            // labelled current RDS/PS/RT fields can override radio metadata.
+            String candidate = labelledStation;
             stationTitle = candidate;
             // A retune must not keep the previous station alive.
             return stationTitle;

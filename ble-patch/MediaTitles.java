@@ -16,7 +16,7 @@ final class MediaTitles {
         String s = raw.replaceAll("[\\p{Cntrl}\\s]+", " ").trim();
         if (s.isEmpty() || s.length() > 200) return "";
         String u = s.toUpperCase(Locale.ROOT);
-        if (u.matches("T[1-4]")) return "";
+        if (u.matches("NONE|NULL|UNDEFINED|UNKNOWN|N/A|<UNKNOWN>|T[1-4]")) return "";
         if (s.matches("[-+]?\\d{1,3}:\\d{2}(?::\\d{2})?(?:\\s*/\\s*\\d{1,3}:\\d{2}(?::\\d{2})?)?")) return "";
         if (u.matches("\\d+(?:\\s*/\\s*\\d+)?")) return "";
         if (u.matches("PLAY|PAUSE|NEXT|PREV|PREVIOUS|STOP|MUSIC|MP3|USB|SD|BLUETOOTH|LOCAL MUSIC|MUZYKA|USTAWIENIA|SETTINGS|UNKNOWN|UNKNOWN TITLE|UNKNOWN ARTIST")) return "";
