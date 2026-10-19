@@ -16,6 +16,15 @@ public class RdsAccessibilityService extends AccessibilityService {
     static String mediaTitle = "";
     static String stationPackage = "";
     static String stationTitle = "";
+    private static String lastUiPackage = "", lastUiTitle = "";
+    private static long lastUiAt;
+    static String diagnostic = "Brak odczytu ekranu od uruchomienia";
+
+    static String titleFor(String pkg) {
+        boolean probe = foregroundPackage.equals("pl.krupapiotr.mediaprobe");
+        return probe && pkg.equals(lastUiPackage)
+                && android.os.SystemClock.elapsedRealtime() - lastUiAt <= 10000 ? lastUiTitle : "";
+    }
 
     @Override public void onServiceConnected() {
         super.onServiceConnected();
@@ -54,8 +63,12 @@ public class RdsAccessibilityService extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        // MediaBridgeService is the single writer. It samples the actual active
-        // window every second, including when a radio sends no new UI events.
+        if (event != null && event.getPackageName() != null) {
+            String pkg = event.getPackageName().toString();
+            if (MediaTitles.factory(pkg) || pkg.toLowerCase(Locale.ROOT).contains("radio"))
+                readVisibleStation();
+        }
+        // Only MediaBridgeService writes BLE.
     }
 
     @Override public void onInterrupt() { resetStation(); }
@@ -82,14 +95,24 @@ public class RdsAccessibilityService extends AccessibilityService {
             mediaTitle = "";
             if (root == null || root.getPackageName() == null) { resetStation(); return ""; }
             String pkg = root.getPackageName().toString();
+            String labelledStation = "";
             String lower = pkg.toLowerCase(Locale.ROOT);
             if (!lower.equals("com.android.systemui")) foregroundPackage = pkg;
-            if (MediaTitles.factory(pkg)) {
-                Set<String> media = new LinkedHashSet<>();
-                instance.collectMedia(root, media, 0);
-                for (String text : media) {
-                    mediaTitle = MediaTitles.clean(text);
-                    if (!mediaTitle.isEmpty()) break;
+            boolean radio = lower.contains("radio") || lower.contains(".fm");
+            if (MediaTitles.factory(pkg) || radio) {
+                java.util.ArrayList<UiMediaTitle.Field> fields = new java.util.ArrayList<>();
+                instance.collectMedia(root, fields, 0, false);
+                StringBuilder dump = new StringBuilder("Ekran: ").append(pkg);
+                for (UiMediaTitle.Field field : fields) {
+                    if (dump.length() > 2400) break;
+                    dump.append("\n").append(field.id).append(": ").append(field.text);
+                }
+                diagnostic = dump.toString();
+                if (radio) labelledStation = UiMediaTitle.radio(fields);
+                if (!radio) {
+                    mediaTitle = UiMediaTitle.choose(fields);
+                    lastUiPackage = pkg; lastUiTitle = mediaTitle;
+                    lastUiAt = android.os.SystemClock.elapsedRealtime();
                 }
             }
             // A system overlay is not evidence that the radio closed; the lease
@@ -103,10 +126,9 @@ public class RdsAccessibilityService extends AccessibilityService {
             stationPackage = pkg;
             Set<String> texts = new LinkedHashSet<>();
             instance.collect(root, texts, 0);
-            String candidate = instance.chooseBestRadioCandidate(texts);
-            if (!candidate.isEmpty()) stationTitle = candidate;
-            // Retain RDS through frequency-only updates, but only while the same
-            // radio window is actually present. Never fall back to an old event.
+            String candidate = labelledStation.isEmpty() ? instance.chooseBestRadioCandidate(texts) : labelledStation;
+            stationTitle = candidate;
+            // A retune must not keep the previous station alive.
             return stationTitle;
         } catch (Throwable ignored) {
             return "";
@@ -114,20 +136,20 @@ public class RdsAccessibilityService extends AccessibilityService {
             if (root != null) try { root.recycle(); } catch (Throwable ignored) {}
         }
     }
-    // Only title/file-labelled visible nodes are eligible; a playlist row or
-    // arbitrary button must never masquerade as the currently playing title.
-    private void collectMedia(AccessibilityNodeInfo node, Set<String> out, int depth) {
-        if (node == null || depth > 20 || out.size() > 120) return;
-        String id = node.getViewIdResourceName();
-        if (node.isVisibleToUser() && id != null) {
-            String lower = id.toLowerCase(Locale.ROOT);
-            if (lower.matches(".*(title|song_name|track_name|file_name|filename|music_name).*")
-                    && !lower.contains("list") && !lower.contains("album"))
-                addText(out, node.getText());
+    private void collectMedia(AccessibilityNodeInfo node,
+            java.util.List<UiMediaTitle.Field> out, int depth, boolean inList) {
+        if (node == null || depth > 20 || out.size() >= 100) return;
+        boolean list = inList || node.isScrollable() || node.getCollectionInfo() != null;
+        if (node.isVisibleToUser()) {
+            CharSequence text = node.getText();
+            if (text == null || text.toString().trim().isEmpty()) text = node.getContentDescription();
+            if (text != null) out.add(new UiMediaTitle.Field(node.getViewIdResourceName(),
+                    text.toString(), list, node.isClickable() || node.isEditable()));
         }
         for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            try { collectMedia(child, out, depth + 1); }
+            AccessibilityNodeInfo child = null;
+            try { child = node.getChild(i); collectMedia(child, out, depth + 1, list); }
+            catch (RuntimeException ignored) { }
             finally { if (child != null) child.recycle(); }
         }
     }

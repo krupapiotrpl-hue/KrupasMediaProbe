@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         root.setPadding(24, 18, 24, 18);
 
         TextView title = new TextView(this);
-        title.setText("KRUPAS MEDIA PROBE 0.6.3 AUTO – MP3 FIX — K706");
+        title.setText("KRUPAS MEDIA PROBE 0.6.4 AUTO – MP3 FIX — K706");
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
@@ -212,7 +212,8 @@ public class MainActivity extends Activity {
 
         StringBuilder s = new StringBuilder();
 
-        s.append("AUTOSTART / TŁO: WŁĄCZONE\n");
+        s.append(MediaBridgeService.diagnosticNow()).append("\n");
+        if (bleDisplay != null) s.append(bleDisplay.transportStatus()).append("\n\n");
 
         s.append("BLE ZAFIRA-DISPLAY: ")
                 .append(
@@ -251,10 +252,12 @@ public class MainActivity extends Activity {
                 .append("\n\n");
 
         s.append(readMediaSessions());
+        s.append("\n\nOSTATNIA PRÓBKA EKRANU (HISTORIA)\n")
+                .append(RdsAccessibilityService.diagnostic);
 
         s.append("\n\n")
                 .append(
-                        MediaStateStore.dump(this)
+                        "HISTORYCZNY ODCZYT — NIE POTWIERDZA AKTUALNEGO ŹRÓDŁA\n" + MediaStateStore.dump(this)
                 );
 
         out.setText(
@@ -303,6 +306,7 @@ public class MainActivity extends Activity {
                         "ACTIVE MEDIA SESSIONS\n"
                 );
 
+        boolean hasCurrentMetadata = false;
         try {
             MediaSessionManager msm =
                     (MediaSessionManager)
@@ -394,6 +398,7 @@ public class MainActivity extends Activity {
                         !title.isEmpty()
                                 || !artist.isEmpty()
                 ) {
+                    hasCurrentMetadata = true;
                     MediaStateStore.save(
                             this,
                             "MEDIA_SESSION_DIAG",
@@ -425,6 +430,7 @@ public class MainActivity extends Activity {
                     );
         }
 
+        if (!hasCurrentMetadata) s.append("\nBIEŻĄCA SESJA: BRAK TYTUŁU / WYKONAWCY\n");
         return s.toString();
     }
 

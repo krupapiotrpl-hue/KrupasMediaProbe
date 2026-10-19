@@ -23,6 +23,13 @@ public class MediaBridgeService extends Service {
     private static final String CHANNEL_ID = "krupas_media_bridge";
     private static final int NOTIFICATION_ID = 706;
     private static final long POLL_MS = 1000;
+    static String diagnostic = "Usługa wysyłania jeszcze nie uruchomiona";
+    static long observedAt;
+    static String diagnosticNow() {
+        if (observedAt == 0) return diagnostic;
+        return diagnostic + "\nWiek odczytu: "
+                + ((SystemClock.elapsedRealtime() - observedAt) / 1000) + " s";
+    }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
@@ -42,7 +49,10 @@ public class MediaBridgeService extends Service {
         @Override public void run() {
             try {
                 pollAndSend();
-            } catch (Throwable ignored) { publishCandidate(""); }
+            } catch (Throwable error) {
+                diagnostic = "Błąd usługi: " + error.getClass().getSimpleName();
+                publishCandidate("");
+            }
 
             if (ble != null) ble.start();
             handler.postDelayed(this, POLL_MS);
@@ -115,10 +125,19 @@ public class MediaBridgeService extends Service {
                 continue;
             }
             MediaMetadata metadata = controller.getMetadata();
-            String title = MediaTitles.first(meta(metadata, MediaMetadata.METADATA_KEY_TITLE),
+            boolean isRadio = pkg.toLowerCase(java.util.Locale.ROOT).contains("radio")
+                    || pkg.toLowerCase(java.util.Locale.ROOT).contains(".fm");
+            String title = isRadio ? RdsText.join(
+                    meta(metadata, MediaMetadata.METADATA_KEY_TITLE),
+                    meta(metadata, MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
+                    meta(metadata, MediaMetadata.METADATA_KEY_ARTIST),
+                    meta(metadata, MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
+                    meta(metadata, MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION))
+                    : MediaTitles.first(meta(metadata, MediaMetadata.METADATA_KEY_TITLE),
                     meta(metadata, MediaMetadata.METADATA_KEY_DISPLAY_TITLE));
             if (title.isEmpty()) title = MediaProbeNotificationService.titleFor(pkg);
             if (pkg.equals(foreground) && title.isEmpty()) title = RdsAccessibilityService.mediaTitle;
+            if (title.isEmpty()) title = RdsAccessibilityService.titleFor(pkg);
             if (pkg.equals(radioPackage) && !visibleStation.isEmpty()) title = visibleStation;
             active.add(new SourceSelector.Source(pkg, title,
                     state == null ? 0 : state.getLastPositionUpdateTime()));
@@ -140,6 +159,9 @@ public class MediaBridgeService extends Service {
         // Do not show the old owner's title during the new owner's grace period.
         if (selector.changed) displayLease = new DisplayLease();
         String candidate = selected == null ? "" : selected.title;
+        observedAt = SystemClock.elapsedRealtime();
+        diagnostic = "BIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
+                + "\nBIEŻĄCY TYTUŁ: " + (candidate.isEmpty() ? "brak metadanych" : candidate);
         publishCandidate(candidate);
     }
 
@@ -249,7 +271,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("Krupas Media Pro 0.6.3 AUTO – MP3 FIX")
+                .setContentTitle("Krupas Media Pro 0.6.4 AUTO – MP3 FIX")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)

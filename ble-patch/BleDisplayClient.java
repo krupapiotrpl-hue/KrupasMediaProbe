@@ -43,6 +43,7 @@ final class BleDisplayClient {
     private BluetoothGattCharacteristic rx;
     private boolean scanning;
     private boolean connected;
+    private boolean discoveryStarted;
     private long gattStartedAt;
     private String pending = "";
     private String lastSent = "";
@@ -70,6 +71,18 @@ final class BleDisplayClient {
 
     synchronized String getPendingText() {
         return pending.trim();
+    }
+
+    synchronized String transportStatus() {
+        if (!hasPermissions()) return "BRAK UPRAWNIEŃ BLUETOOTH / LOKALIZACJI";
+        if (adapter == null || !adapter.isEnabled()) return "BLUETOOTH WYŁĄCZONY / NIEDOSTĘPNY";
+        if (!isConnected()) return "BRAK POŁĄCZENIA Z PŁYTKĄ";
+        String fitted = BlePayload.fit(pending, maxWriteBytes);
+        return "POŁĄCZONE; limit " + maxWriteBytes + " bajtów"
+                + (fitted.equals(pending) ? "" : "; TYTUŁ SKRÓCONY DO LIMITU BLE")
+                + "\nOSTATNI POTWIERDZONY ZAPIS BLE: "
+                + (lastSent.isEmpty() ? "brak" : lastSent.trim())
+                + "\nPotwierdzenie BLE nie potwierdza wyświetlenia przez CAN.";
     }
 
     void start() {
@@ -200,13 +213,8 @@ final class BleDisplayClient {
                 } catch (Throwable ignored) {}
             }
 
-            if (!mtuRequested) {
-                try {
-                    callbackGatt.discoverServices();
-                } catch (Throwable ignored) {
-                    reconnect(callbackGatt);
-                }
-            }
+            if (!mtuRequested) discover(callbackGatt);
+            else handler.postDelayed(() -> discover(callbackGatt), 2000);
         }
 
         @Override public void onMtuChanged(
@@ -218,11 +226,7 @@ final class BleDisplayClient {
                 if (gatt != callbackGatt) return;
                 maxWriteBytes = status == BluetoothGatt.GATT_SUCCESS ? Math.max(20, mtu - 3) : 20;
             }
-            try {
-                callbackGatt.discoverServices();
-            } catch (Throwable ignored) {
-                reconnect(callbackGatt);
-            }
+            discover(callbackGatt);
         }
 
         @Override public void onServicesDiscovered(
@@ -276,6 +280,15 @@ final class BleDisplayClient {
         }
     };
 
+    private void discover(BluetoothGatt target) {
+        synchronized (this) {
+            if (gatt != target || discoveryStarted) return;
+            discoveryStarted = true;
+        }
+        try { if (!target.discoverServices()) reconnect(target); }
+        catch (RuntimeException ignored) { reconnect(target); }
+    }
+
     private void reconnect(BluetoothGatt callbackGatt) {
         synchronized (this) {
             if (gatt == callbackGatt) {
@@ -323,17 +336,12 @@ final class BleDisplayClient {
     private synchronized void writePending() {
         if (!hasPermissions() || gatt == null || rx == null || !inFlight.isEmpty()) return;
         if (pending.isEmpty()) return;
-        if (pending.equals(lastSent) && (pending.equals(" ")
+        String payload = BlePayload.fit(pending, maxWriteBytes);
+        if (payload.equals(lastSent) && (payload.equals(" ")
                 || SystemClock.elapsedRealtime() - lastConfirmedAt < 2000)) return;
-        byte[] bytes = pending.getBytes(StandardCharsets.UTF_8);
-        // The ESP treats each BLE write as a complete title. Never split a title
-        // into independent writes or silently drop its first/last characters.
-        if (bytes.length > maxWriteBytes) {
-            android.util.Log.w("KrupasBLE", "Title exceeds negotiated MTU; retaining full title");
-            return;
-        }
+        byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
         try {
-            inFlight = pending;
+            inFlight = payload;
             rx.setValue(bytes);
             if (gatt.writeCharacteristic(rx)) {
                 handler.removeCallbacks(writeTimeout);
@@ -350,6 +358,7 @@ final class BleDisplayClient {
         handler.removeCallbacks(writeTimeout);
         inFlight = "";
         maxWriteBytes = 20;
+        discoveryStarted = false;
         BluetoothGatt current = gatt;
 
         gatt = null;
@@ -369,6 +378,7 @@ final class BleDisplayClient {
             handler.removeCallbacks(writeTimeout);
             inFlight = "";
             maxWriteBytes = 20;
+            discoveryStarted = false;
             gatt = null;
             rx = null;
             connected = false;
