@@ -23,11 +23,11 @@ public class MediaSourcesTest {
         eq("YouTube title", selector.select(yt.pkg, Arrays.asList(mp3, yt), null).title);
         if (!selector.changed) throw new AssertionError("owner transition must clear lease");
         eq("YouTube title", selector.select("launcher", Arrays.asList(mp3, yt), null).title);
-        if (selector.select("launcher", Arrays.asList(mp3), null) != null)
-            throw new AssertionError("retired MP3 returned after YouTube stopped");
         // Even a newly updated stale MP3 state cannot steal YouTube ownership.
         mp3 = new SourceSelector.Source(mp3.pkg, "Old MP3", 9999999);
         eq("YouTube title", selector.select("launcher", Arrays.asList(mp3, yt), null).title);
+        if (selector.select("launcher", Arrays.asList(mp3), null) != null)
+            throw new AssertionError("retired MP3 returned after YouTube stopped");
         // YouTube opens before its MediaSession supplies a title.
         eq("", selector.select(yt.pkg, Arrays.asList(mp3),
                 new SourceSelector.Source(yt.pkg, "", 0)).title);
