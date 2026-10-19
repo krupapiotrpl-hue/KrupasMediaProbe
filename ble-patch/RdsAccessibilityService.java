@@ -12,6 +12,8 @@ import java.util.Set;
 public class RdsAccessibilityService extends AccessibilityService {
     private BleDisplayClient ble;
     private static RdsAccessibilityService instance;
+    static String foregroundPackage = "";
+    static String mediaTitle = "";
     static String stationPackage = "";
     static String stationTitle = "";
 
@@ -70,13 +72,26 @@ public class RdsAccessibilityService extends AccessibilityService {
     }
 
     static String readVisibleStation() {
+        foregroundPackage = "";
+        mediaTitle = "";
         if (instance == null) { resetStation(); return ""; }
         AccessibilityNodeInfo root = null;
         try {
             root = instance.getRootInActiveWindow();
+            foregroundPackage = "";
+            mediaTitle = "";
             if (root == null || root.getPackageName() == null) { resetStation(); return ""; }
             String pkg = root.getPackageName().toString();
             String lower = pkg.toLowerCase(Locale.ROOT);
+            if (!lower.equals("com.android.systemui")) foregroundPackage = pkg;
+            if (MediaTitles.factory(pkg)) {
+                Set<String> media = new LinkedHashSet<>();
+                instance.collectMedia(root, media, 0);
+                for (String text : media) {
+                    mediaTitle = MediaTitles.clean(text);
+                    if (!mediaTitle.isEmpty()) break;
+                }
+            }
             // A system overlay is not evidence that the radio closed; the lease
             // tolerates a brief absence without renewing an unobserved source.
             if (lower.equals("com.android.systemui")) return "";
@@ -99,6 +114,24 @@ public class RdsAccessibilityService extends AccessibilityService {
             if (root != null) try { root.recycle(); } catch (Throwable ignored) {}
         }
     }
+    // Only title/file-labelled visible nodes are eligible; a playlist row or
+    // arbitrary button must never masquerade as the currently playing title.
+    private void collectMedia(AccessibilityNodeInfo node, Set<String> out, int depth) {
+        if (node == null || depth > 20 || out.size() > 120) return;
+        String id = node.getViewIdResourceName();
+        if (node.isVisibleToUser() && id != null) {
+            String lower = id.toLowerCase(Locale.ROOT);
+            if (lower.matches(".*(title|song_name|track_name|file_name|filename|music_name).*")
+                    && !lower.contains("list") && !lower.contains("album"))
+                addText(out, node.getText());
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            try { collectMedia(child, out, depth + 1); }
+            finally { if (child != null) child.recycle(); }
+        }
+    }
+
     private void collect(
             AccessibilityNodeInfo node,
             Set<String> out,

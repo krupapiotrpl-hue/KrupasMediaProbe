@@ -26,7 +26,8 @@ public class MediaBridgeService extends Service {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
-    private final DisplayLease displayLease = new DisplayLease();
+    private DisplayLease displayLease = new DisplayLease();
+    private final SourceSelector selector = new SourceSelector();
 
     static void start(Context context) {
         Intent i = new Intent(context, MediaBridgeService.class);
@@ -95,37 +96,50 @@ public class MediaBridgeService extends Service {
             // A visible radio without MediaSession can still supply RDS.
         }
 
-        MediaController best = null;
-        long bestScore = Long.MIN_VALUE;
-        boolean visibleRadioStopped = false;
-        if (sessions != null) for (MediaController controller : sessions) {
+        java.util.ArrayList<SourceSelector.Source> active = new java.util.ArrayList<>();
+        boolean visibleStopped = false;
+        String foreground = RdsAccessibilityService.foregroundPackage;
+        for (MediaController controller : sessions == null
+                ? java.util.Collections.<MediaController>emptyList() : sessions) {
             if (controller == null) continue;
+            String pkg = controller.getPackageName();
             PlaybackState state = controller.getPlaybackState();
-            if (state == null) continue;
-            int value = state.getState();
-            boolean active = value == PlaybackState.STATE_PLAYING
+            int value = state == null ? PlaybackState.STATE_NONE : state.getState();
+            boolean playing = value == PlaybackState.STATE_PLAYING
                     || value == PlaybackState.STATE_BUFFERING
                     || value == PlaybackState.STATE_CONNECTING;
-            if (!active) {
-                if (controller.getPackageName().equals(radioPackage)) visibleRadioStopped = true;
+            if (!playing) {
+                if (pkg.equals(foreground) && state != null
+                        && (value == PlaybackState.STATE_PAUSED || value == PlaybackState.STATE_STOPPED
+                        || value == PlaybackState.STATE_ERROR)) visibleStopped = true;
                 continue;
             }
-            long candidateScore = score(state);
-            if (candidateScore > bestScore) {
-                best = controller;
-                bestScore = candidateScore;
-            }
+            MediaMetadata metadata = controller.getMetadata();
+            String title = MediaTitles.first(meta(metadata, MediaMetadata.METADATA_KEY_TITLE),
+                    meta(metadata, MediaMetadata.METADATA_KEY_DISPLAY_TITLE));
+            if (title.isEmpty()) title = MediaProbeNotificationService.titleFor(pkg);
+            if (pkg.equals(foreground) && title.isEmpty()) title = RdsAccessibilityService.mediaTitle;
+            if (pkg.equals(radioPackage) && !visibleStation.isEmpty()) title = visibleStation;
+            active.add(new SourceSelector.Source(pkg, title,
+                    state == null ? 0 : state.getLastPositionUpdateTime()));
         }
-
-        String candidate = "";
-        if (best != null) {
-            candidate = meta(best.getMetadata(), MediaMetadata.METADATA_KEY_TITLE);
-            if (best.getPackageName().equals(radioPackage) && !visibleStation.isEmpty()) {
-                candidate = visibleStation;
-            }
-        } else if (!visibleRadioStopped) {
-            candidate = visibleStation;
+        SourceSelector.Source visible = null;
+        if (foreground.toLowerCase(java.util.Locale.ROOT).contains("youtube")) {
+            visible = new SourceSelector.Source(foreground,
+                    MediaProbeNotificationService.titleFor(foreground), 0);
         }
+        if (!visibleStopped && !foreground.isEmpty()) {
+            String title = visibleStation;
+            if (title.isEmpty() && MediaTitles.factory(foreground)) {
+                title = MediaTitles.first(RdsAccessibilityService.mediaTitle,
+                        MediaProbeNotificationService.titleFor(foreground));
+            }
+            if (!title.isEmpty()) visible = new SourceSelector.Source(foreground, title, 0);
+        }
+        SourceSelector.Source selected = selector.select(foreground, active, visible);
+        // Do not show the old owner's title during the new owner's grace period.
+        if (selector.changed) displayLease = new DisplayLease();
+        String candidate = selected == null ? "" : selected.title;
         publishCandidate(candidate);
     }
 
@@ -235,7 +249,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("KRUPAS MEDIA 0.6.2 TEST")
+                .setContentTitle("Krupas Media Pro 0.6.3 AUTO – MP3 FIX")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)
