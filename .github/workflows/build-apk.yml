@@ -1,7 +1,7 @@
-name: Zbuduj instalator APK 0.6.5 TEST
+name: Zbuduj instalator APK 0.6.6 RADIO SCREEN RDS
 on:
   push:
-    branches: [fix/0.6.5-rds-placeholders]
+    branches: [fix/0.6.6-radio-screen-rds]
   workflow_dispatch:
 
 permissions:
@@ -72,12 +72,12 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.5-AUTO-MP3-FIX.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.6-RADIO-SCREEN-RDS.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.6.5-AUTO-MP3-FIX
-          path: KRUPAS-Media-Probe-0.6.5-AUTO-MP3-FIX.apk
+          name: KRUPAS-Media-Probe-0.6.6-RADIO-SCREEN-RDS
+          path: KRUPAS-Media-Probe-0.6.6-RADIO-SCREEN-RDS.apk
           if-no-files-found: error
 
   firmware:
