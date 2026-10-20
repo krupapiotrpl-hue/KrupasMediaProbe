@@ -169,8 +169,8 @@ public class MediaBridgeService extends Service {
 
     private static String radioLabel(String title) {
         String clean = title == null ? "" : title.trim();
-        if (clean.isEmpty() || clean.matches("(?i)(?:FM\\\\s*)?\\\\d{2,3}[.,]\\\\d+\\\\s*(?:MHZ)?")) return "";
-        return clean.matches("(?i)^RADIO(?:\\\\s+.*)?$") ? clean : "RADIO " + clean;
+        if (clean.isEmpty() || clean.matches("(?i)(?:FM\\s*)?\\d{2,3}[.,]\\d+\\s*(?:MHZ)?")) return "";
+        return clean.matches("(?i)^RADIO(?:\\s+.*)?$") ? clean : "RADIO " + clean;
     }
 
     private void publishCandidate(String candidate) {
