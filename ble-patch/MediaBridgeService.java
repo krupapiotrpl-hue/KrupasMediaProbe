@@ -96,6 +96,7 @@ public class MediaBridgeService extends Service {
     private void pollAndSend() {
         String visibleStation = RdsAccessibilityService.readVisibleStation();
         String radioPackage = RdsAccessibilityService.stationPackage;
+        if (!visibleStation.isEmpty()) visibleStation = radioLabel(visibleStation);
         MediaSessionManager manager =
                 (MediaSessionManager) getSystemService(Context.MEDIA_SESSION_SERVICE);
         List<MediaController> sessions = null;
@@ -139,6 +140,7 @@ public class MediaBridgeService extends Service {
             if (pkg.equals(foreground) && title.isEmpty()) title = RdsAccessibilityService.mediaTitle;
             if (title.isEmpty()) title = RdsAccessibilityService.titleFor(pkg);
             if (pkg.equals(radioPackage) && !visibleStation.isEmpty()) title = visibleStation;
+            else if (isRadio && !title.isEmpty()) title = radioLabel(title);
             active.add(new SourceSelector.Source(pkg, title,
                     state == null ? 0 : state.getLastPositionUpdateTime()));
         }
@@ -163,6 +165,12 @@ public class MediaBridgeService extends Service {
         diagnostic = "BIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
                 + "\nBIEŻĄCY TYTUŁ: " + (candidate.isEmpty() ? "brak metadanych" : candidate);
         publishCandidate(candidate);
+    }
+
+    private static String radioLabel(String title) {
+        String clean = title == null ? "" : title.trim();
+        if (clean.isEmpty() || clean.matches("(?i)(?:FM\\\\s*)?\\\\d{2,3}[.,]\\\\d+\\\\s*(?:MHZ)?")) return "";
+        return clean.matches("(?i)^RADIO(?:\\\\s+.*)?$") ? clean : "RADIO " + clean;
     }
 
     private void publishCandidate(String candidate) {
@@ -271,7 +279,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("Krupas Media Pro 0.6.5 AUTO – MP3 FIX")
+                .setContentTitle("Krupas Media Pro 0.6.6 RADIO SCREEN RDS")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)
