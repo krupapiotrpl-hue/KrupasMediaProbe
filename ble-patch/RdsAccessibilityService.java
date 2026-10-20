@@ -18,6 +18,7 @@ public class RdsAccessibilityService extends AccessibilityService {
     static String stationTitle = "";
     private static String lastUiPackage = "", lastUiTitle = "";
     private static long lastUiAt;
+    private static final RadioRdsCache eventRds = new RadioRdsCache();
     private static final StableTitle stableMedia = new StableTitle();
     static String diagnostic = "Brak odczytu ekranu od uruchomienia";
 
@@ -41,7 +42,8 @@ public class RdsAccessibilityService extends AccessibilityService {
             info.eventTypes =
                     AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED |
                     AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED |
-                    AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED;
+                    AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED |
+                    AccessibilityEvent.TYPE_WINDOWS_CHANGED;
 
             info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
             info.notificationTimeout = 150;
@@ -64,6 +66,26 @@ public class RdsAccessibilityService extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
+        RadioDiagnostics.event(event);
+        if (event != null && event.getPackageName() != null
+                && RadioDiagnostics.radio(event.getPackageName().toString())) {
+            AccessibilityNodeInfo source = null;
+            try {
+                source = event.getSource();
+                if (source != null && source.isVisibleToUser()) {
+                    java.util.ArrayList<UiMediaTitle.Field> fields = new java.util.ArrayList<>();
+                    String id = source.getViewIdResourceName();
+                    fields.add(new UiMediaTitle.Field(id,
+                            source.getText() == null ? "" : source.getText().toString(), false, false));
+                    for (CharSequence text : event.getText()) fields.add(new UiMediaTitle.Field(id,
+                            text == null ? "" : text.toString(), false, false));
+                    String title = UiMediaTitle.radio(fields);
+                    if (!title.isEmpty()) eventRds.observe(event.getPackageName().toString(), title,
+                            android.os.SystemClock.elapsedRealtime());
+                }
+            } catch (RuntimeException ignored) { }
+            finally { if (source != null) source.recycle(); }
+        }
         if (event != null && event.getPackageName() != null) {
             String pkg = event.getPackageName().toString();
             if (MediaTitles.factory(pkg) || pkg.toLowerCase(Locale.ROOT).contains("radio"))
@@ -89,9 +111,10 @@ public class RdsAccessibilityService extends AccessibilityService {
         foregroundPackage = "";
         mediaTitle = "";
         if (instance == null) { resetStation(); return ""; }
+        RadioDiagnostics.capture(instance);
         AccessibilityNodeInfo root = null;
         try {
-            root = instance.getRootInActiveWindow();
+            root = instance.foregroundRoot();
             foregroundPackage = "";
             mediaTitle = "";
             if (root == null || root.getPackageName() == null) { resetStation(); return ""; }
@@ -130,7 +153,8 @@ public class RdsAccessibilityService extends AccessibilityService {
             instance.collect(root, texts, 0);
             // Preset names are not evidence of the tuned station. Only explicitly
             // labelled current RDS/PS/RT fields can override radio metadata.
-            String candidate = labelledStation;
+            String candidate = labelledStation.isEmpty()
+                    ? eventRds.read(pkg, android.os.SystemClock.elapsedRealtime()) : labelledStation;
             stationTitle = candidate;
             // A retune must not keep the previous station alive.
             return stationTitle;
@@ -140,6 +164,27 @@ public class RdsAccessibilityService extends AccessibilityService {
             if (root != null) try { root.recycle(); } catch (Throwable ignored) {}
         }
     }
+    // An active/focused radio window can sit below a transient SystemUI root.
+    // Never choose a background radio when YouTube or Probe owns the screen.
+    private AccessibilityNodeInfo foregroundRoot() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root != null && root.getPackageName() != null
+                && !root.getPackageName().toString().equals("com.android.systemui")) return root;
+        java.util.List<android.view.accessibility.AccessibilityWindowInfo> windows = getWindows();
+        if (windows != null) for (android.view.accessibility.AccessibilityWindowInfo window : windows) {
+            if (!window.isActive() && !window.isFocused()) continue;
+            AccessibilityNodeInfo candidate = window.getRoot();
+            if (candidate == null) continue;
+            if (candidate.getPackageName() != null
+                    && RadioDiagnostics.radio(candidate.getPackageName().toString())) {
+                if (root != null) root.recycle();
+                return candidate;
+            }
+            candidate.recycle();
+        }
+        return root;
+    }
+
     private void collectMedia(AccessibilityNodeInfo node,
             java.util.List<UiMediaTitle.Field> out, int depth, boolean inList) {
         if (node == null || depth > 20 || out.size() >= 100) return;

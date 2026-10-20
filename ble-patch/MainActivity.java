@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         root.setPadding(24, 18, 24, 18);
 
         TextView title = new TextView(this);
-        title.setText("KRUPAS MEDIA PROBE 0.6.5 AUTO – MP3 FIX — K706");
+        title.setText("KRUPAS MEDIA PROBE 0.6.6 AUTO – MP3 FIX — K706");
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
@@ -184,6 +184,21 @@ public class MainActivity extends Activity {
         buttons.addView(refresh);
 
         root.addView(buttons);
+
+        Button copy = new Button(this);
+        copy.setText("KOPIUJ DIAGNOSTYKĘ");
+        copy.setOnClickListener(v -> {
+            refresh();
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null && out != null) {
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                        "Krupas Media 0.6.6 — diagnostyka", out.getText()));
+                android.widget.Toast.makeText(this, "Diagnostyka skopiowana — możesz wkleić ją do rozmowy",
+                        android.widget.Toast.LENGTH_LONG).show();
+            }
+        });
+        root.addView(copy);
 
         ScrollView sv = new ScrollView(this);
 
@@ -255,6 +270,7 @@ public class MainActivity extends Activity {
         s.append("\n\nOSTATNIA PRÓBKA EKRANU (HISTORIA)\n")
                 .append(RdsAccessibilityService.diagnostic);
 
+        s.append("\n\n").append(RadioDiagnostics.report());
         s.append("\n\n")
                 .append(
                         "HISTORYCZNY ODCZYT — NIE POTWIERDZA AKTUALNEGO ŹRÓDŁA\n" + MediaStateStore.dump(this)

@@ -158,7 +158,7 @@ public class MediaBridgeService extends Service {
         SourceSelector.Source selected = selector.select(foreground, active, visible);
         // Do not show the old owner's title during the new owner's grace period.
         if (selector.changed) displayLease = new DisplayLease();
-        String candidate = selected == null ? "" : selected.title;
+        String candidate = selected == null ? "" : DisplayText.format(selected.pkg, selected.title);
         observedAt = SystemClock.elapsedRealtime();
         diagnostic = "BIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
                 + "\nBIEŻĄCY TYTUŁ: " + (candidate.isEmpty() ? "brak metadanych" : candidate);
@@ -271,7 +271,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("Krupas Media Pro 0.6.5 AUTO – MP3 FIX")
+                .setContentTitle("Krupas Media Pro 0.6.6 AUTO – MP3 FIX")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)

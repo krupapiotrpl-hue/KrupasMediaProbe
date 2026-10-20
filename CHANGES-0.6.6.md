@@ -1,0 +1,11 @@
+# 0.6.6 AUTO MP3 FIX — RDS format and local diagnostics
+
+Based on verified 0.6.5 commit 3e6b7526961bc3fc0b86ea7b479a709dd25d9276. Separate branch fix/0.6.6-rds-diagnostics. Stable branches untouched.
+
+Fix the reported R Lublin | - suffix: reject punctuation-only radio fields and duplicate station labels (case-insensitive) before adding separators. Preserve real punctuation within titles, short PS values like SK, and clock values inside radio data. No routing, BLE protocol, firmware or MP3/YouTube extraction changes.
+
+FM remains unresolved on hardware: the user sees SK on the factory radio but the old accessibility sample has no SK and contains presets/buttons. This release adds a separate local snapshot of radio roots from active/interactive windows (visible flags, IDs, text, descriptions) and the last twelve radio accessibility events. Diagnostics include node source/event text and window focus/active status. They never become display metadata, do not read unrelated apps and are not uploaded. Snapshot age is shown. Capture is bounded by depth, nodes, output size and a two-second interval. Probe has a Copy diagnostics button for sharing at the user's discretion.
+
+Tests cover the reported separator suffix, empty inputs, case-insensitive duplicate PS names, genuine punctuation, RDS clocks, and preset exclusion, plus existing MP3/source/BLE/expiry tests. CI builds APK and verifies its signature, plus the unchanged ESP 1.9F firmware. Hardware test remains necessary; this is not a claim that factory FM RDS is repaired. ESP 1.9D was requested as a rollback; its clear/expiry behavior differs from 1.9F and is not changed by this APK.
+
+User-requested FM extension: prefix outgoing radio-source data with Radio (without duplicating an existing Radio prefix). Accept explicitly-labelled PS/RT from visible radio accessibility text events with a 2.5-second same-foreground-package TTL; background events never take over YouTube. Permit clickable current RDS labels, still reject presets and list rows. An active/focused radio window can be used under a transient SystemUI root. Hardware RDS is not confirmed until tested on the K706. No raw tuner decoding or frequency-to-station substitution is claimed.
