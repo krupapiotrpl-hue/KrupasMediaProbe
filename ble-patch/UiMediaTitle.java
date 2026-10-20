@@ -50,8 +50,8 @@ final class UiMediaTitle {
     private static String normalizedFrequency(String value) {
         if (value == null) return "";
         String text = value.trim().replace(',', '.');
-        if (!text.matches("(?i)(?:FM\\\\s*)?\\\\d{2,3}\\\\.\\\\d{1,2}\\\\s*(?:MHZ)?")) return "";
-        text = text.replaceFirst("(?i)^FM\\\\s*", "").trim();
+        if (!text.matches("(?i)(?:FM\\s*)?\\d{2,3}\\.\\d{1,2}\\s*(?:MHZ)?")) return "";
+        text = text.replaceFirst("(?i)^FM\\s*", "").trim();
         return "FM " + text;
     }
     static final class Field {
