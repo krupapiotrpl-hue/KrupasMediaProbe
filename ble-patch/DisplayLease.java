@@ -2,7 +2,7 @@ package pl.krupapiotr.mediaprobe;
 
 /** Only freshly observed sources renew the display. Uses a monotonic clock. */
 final class DisplayLease {
-    static final long GRACE_MS = 2500;
+    static final long GRACE_MS = 5000;
     private String text = "";
     private long missingSince = -1;
 
