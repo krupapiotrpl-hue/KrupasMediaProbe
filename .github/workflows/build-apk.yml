@@ -24,7 +24,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Test source expiry lifecycle
+      - name: Test RDS, rotacji i wygasania napisow
         run: |
           mkdir -p test-classes
           javac -d test-classes ble-patch/DisplayLease.java ble-patch/MediaTitles.java ble-patch/SourceSelector.java tests/DisplayLeaseTest.java tests/MediaSourcesTest.java ble-patch/UiMediaTitle.java ble-patch/RdsText.java ble-patch/BlePayload.java tests/UiAndBleTest.java ble-patch/StableTitle.java tests/StableTitleTest.java
@@ -42,7 +42,7 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw KRUPAS MEDIA 0.6.5 TEST
+      - name: Wstaw poprawki KRUPAS MEDIA 0.6.6 RADIO SCREEN RDS
         run: |
           cp ble-patch/StableTitle.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
           cp ble-patch/RdsText.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
