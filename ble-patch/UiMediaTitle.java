@@ -22,12 +22,12 @@ final class UiMediaTitle {
         for (Field f : fields) {
             if (f.list || f.control || f.id.contains("preset")) continue;
             String t = f.text == null ? "" : f.text.trim();
-            if (t.matches("(?i)(?:FM\\\\s*)?\\\\d{2,3}[.,]\\\\d{1,2}\\\\s*(?:MHZ)?")) {
+            if (t.matches("(?i)(?:FM\\s*)?\\d{2,3}[.,]\\d{1,2}\\s*(?:MHZ)?")) {
                 hasFrequency = true;
                 continue;
             }
             if (!f.id.isEmpty() && !f.id.matches(".*(current|station|radio|display|name|text|title).*")) continue;
-            if (t.length() < 3 || t.length() > 42 || !t.matches(".*\\\\p{L}.*")
+            if (t.length() < 3 || t.length() > 42 || !t.matches(".*\\p{L}.*")
                     || t.matches("(?i)(RDS|FM|AM|STEREO|SCAN|BAND|PTY|TA|AF|LOC|DX|SETTINGS|MENU|RADIO|UNKNOWN|NONE|NULL|[Tt][1-4])"))
                 continue;
             candidates.add(t);
