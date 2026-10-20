@@ -19,7 +19,7 @@ public class UiAndBleTest {
             new UiMediaTitle.Field("title", "Lista utworów", true, false))));
         eq("Radio ZET", UiMediaTitle.choose(Arrays.asList(new UiMediaTitle.Field("station_name", "Radio ZET", false, false))));
         eq("Nieznana stacja", UiMediaTitle.radio(Arrays.asList(new UiMediaTitle.Field("rds_ps", "Nieznana stacja", false, false))));
-        eq("", UiMediaTitle.radio(Arrays.asList(new UiMediaTitle.Field("rds_ps", "FM 107.0", false, false))));
+        eq("FM 107.0", UiMediaTitle.radio(Arrays.asList(new UiMediaTitle.Field("rds_ps", "FM 107.0", false, false))));
         eq("Radio ZET | EMO - Letni deszcz | 14:30", UiMediaTitle.radio(Arrays.asList(
             new UiMediaTitle.Field("rds_ps", "Radio ZET", false, false),
             new UiMediaTitle.Field("radio_text", "EMO - Letni deszcz", false, false),
@@ -28,11 +28,11 @@ public class UiAndBleTest {
         eq("VOX FM", UiMediaTitle.radio(Arrays.asList(
             new UiMediaTitle.Field("", "95,6 MHz", false, false),
             new UiMediaTitle.Field("", "VOX FM", false, false))));
-        eq("", UiMediaTitle.radio(Arrays.asList(
+        eq("FM 95.6 MHz", UiMediaTitle.radio(Arrays.asList(
             new UiMediaTitle.Field("", "95,6 MHz", false, false),
             new UiMediaTitle.Field("", "VOX FM", false, false),
             new UiMediaTitle.Field("", "RMF FM", false, false))));
-        eq("", UiMediaTitle.radio(Arrays.asList(
+        eq("FM 95.6 MHz", UiMediaTitle.radio(Arrays.asList(
             new UiMediaTitle.Field("", "95,6 MHz", false, false),
             new UiMediaTitle.Field("preset", "VOX FM", false, true))));
         eq("14:30", RdsText.join("14:30", "14:30"));
