@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
         root.setPadding(24, 18, 24, 18);
 
         TextView title = new TextView(this);
-        title.setText("KRUPAS MEDIA PROBE 0.6.5 AUTO – MP3 FIX — K706");
+        title.setText("KRUPAS MEDIA PROBE 0.6.6 RADIO SCREEN RDS — K706");
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
