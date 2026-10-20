@@ -18,12 +18,14 @@ final class UiMediaTitle {
         // a frequency and has exactly one eligible text candidate. Never use
         // preset/list or clickable station buttons as evidence of live RDS.
         boolean hasFrequency = false;
+        String currentFrequency = "";
         java.util.LinkedHashSet<String> candidates = new java.util.LinkedHashSet<>();
         for (Field f : fields) {
             if (f.list || f.control || f.id.contains("preset")) continue;
             String t = f.text == null ? "" : f.text.trim();
             if (t.matches("(?i)(?:FM\\s*)?\\d{2,3}[.,]\\d{1,2}\\s*(?:MHZ)?")) {
                 hasFrequency = true;
+                currentFrequency = t.replace(',', '.');
                 continue;
             }
             if (!f.id.isEmpty() && !f.id.matches(".*(current|station|radio|display|name|text|title).*")) continue;
@@ -33,7 +35,8 @@ final class UiMediaTitle {
             candidates.add(t);
         }
         return hasFrequency && candidates.size() == 1
-                ? RdsText.join(candidates.iterator().next()) : "";
+                ? RdsText.join(candidates.iterator().next())
+                : (hasFrequency ? "FM " + currentFrequency.replaceFirst("(?i)^FM\\s*", "") : "");
 
     }
     static final class Field {
