@@ -25,6 +25,16 @@ public class UiAndBleTest {
             new UiMediaTitle.Field("radio_text", "EMO - Letni deszcz", false, false),
             new UiMediaTitle.Field("rds_clock", "14:30", false, false),
             new UiMediaTitle.Field("android_clock", "15:00", false, false))));
+        eq("VOX FM", UiMediaTitle.radio(Arrays.asList(
+            new UiMediaTitle.Field("", "95,6 MHz", false, false),
+            new UiMediaTitle.Field("", "VOX FM", false, false))));
+        eq("", UiMediaTitle.radio(Arrays.asList(
+            new UiMediaTitle.Field("", "95,6 MHz", false, false),
+            new UiMediaTitle.Field("", "VOX FM", false, false),
+            new UiMediaTitle.Field("", "RMF FM", false, false))));
+        eq("", UiMediaTitle.radio(Arrays.asList(
+            new UiMediaTitle.Field("", "95,6 MHz", false, false),
+            new UiMediaTitle.Field("preset", "VOX FM", false, true))));
         eq("14:30", RdsText.join("14:30", "14:30"));
         eq("", MediaTitles.clean("14:30"));
         String title = "Łódź 🎵 Letni deszcz official video";
