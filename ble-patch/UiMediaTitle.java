@@ -12,7 +12,15 @@ final class UiMediaTitle {
             if (f.list || f.control || f.id.contains("preset") || !f.id.matches(".*(rds|station_name|program_service|radio_text|radiotext|/ps$|/rt$|/tv_ps$|/tv_rt$).*")) continue;
             values.add(f.text);
         }
-        if (!values.isEmpty()) return RdsText.join(values.toArray(new String[0]));
+        if (!values.isEmpty()) {
+            String named = RdsText.join(values.toArray(new String[0]));
+            if (!named.isEmpty()) return named;
+            // Radio UI sometimes exposes only a frequency in an RDS field.
+            for (String value : values) {
+                String freq = normalizedFrequency(value);
+                if (!freq.isEmpty()) return freq;
+            }
+        }
         // Some K706 radio skins expose the current station as plain TextView
         // without a resource ID. Use it ONLY if the visible panel also exposes
         // a frequency and has exactly one eligible text candidate. Never use
@@ -36,8 +44,15 @@ final class UiMediaTitle {
         }
         return hasFrequency && candidates.size() == 1
                 ? RdsText.join(candidates.iterator().next())
-                : (hasFrequency ? "FM " + currentFrequency.replaceFirst("(?i)^FM\\s*", "") : "");
+                : (hasFrequency ? normalizedFrequency(currentFrequency) : "");
 
+    }
+    private static String normalizedFrequency(String value) {
+        if (value == null) return "";
+        String text = value.trim().replace(',', '.');
+        if (!text.matches("(?i)(?:FM\\\\s*)?\\\\d{2,3}\\\\.\\\\d{1,2}\\\\s*(?:MHZ)?")) return "";
+        text = text.replaceFirst("(?i)^FM\\\\s*", "").trim();
+        return "FM " + text;
     }
     static final class Field {
         final String id, text;
