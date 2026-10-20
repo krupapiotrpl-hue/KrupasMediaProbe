@@ -12,7 +12,29 @@ final class UiMediaTitle {
             if (f.list || f.control || f.id.contains("preset") || !f.id.matches(".*(rds|station_name|program_service|radio_text|radiotext|/ps$|/rt$|/tv_ps$|/tv_rt$).*")) continue;
             values.add(f.text);
         }
-        return RdsText.join(values.toArray(new String[0]));
+        if (!values.isEmpty()) return RdsText.join(values.toArray(new String[0]));
+        // Some K706 radio skins expose the current station as plain TextView
+        // without a resource ID. Use it ONLY if the visible panel also exposes
+        // a frequency and has exactly one eligible text candidate. Never use
+        // preset/list or clickable station buttons as evidence of live RDS.
+        boolean hasFrequency = false;
+        java.util.LinkedHashSet<String> candidates = new java.util.LinkedHashSet<>();
+        for (Field f : fields) {
+            if (f.list || f.control || f.id.contains("preset")) continue;
+            String t = f.text == null ? "" : f.text.trim();
+            if (t.matches("(?i)(?:FM\\\\s*)?\\\\d{2,3}[.,]\\\\d{1,2}\\\\s*(?:MHZ)?")) {
+                hasFrequency = true;
+                continue;
+            }
+            if (!f.id.isEmpty() && !f.id.matches(".*(current|station|radio|display|name|text|title).*")) continue;
+            if (t.length() < 3 || t.length() > 42 || !t.matches(".*\\\\p{L}.*")
+                    || t.matches("(?i)(RDS|FM|AM|STEREO|SCAN|BAND|PTY|TA|AF|LOC|DX|SETTINGS|MENU|RADIO|UNKNOWN|NONE|NULL|[Tt][1-4])"))
+                continue;
+            candidates.add(t);
+        }
+        return hasFrequency && candidates.size() == 1
+                ? RdsText.join(candidates.iterator().next()) : "";
+
     }
     static final class Field {
         final String id, text;
