@@ -1,0 +1,31 @@
+name: Compile 1.9D coolant diagnostic (no footer write)
+on:
+  push:
+    branches: [test/1.9d-coolant-diagnostic]
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test coolant decoder and freshness
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I firmware/KRUPAS_OPEL_DISPLAY_1_9D_COOLANT_DIAG tests/CoolantSampleTest.cpp -o /tmp/coolant-test
+          /tmp/coolant-test
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32 core
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Compile diagnostic firmware
+        run: arduino-cli compile --fqbn esp32:esp32:esp32s3 --output-dir esp-build firmware/KRUPAS_OPEL_DISPLAY_1_9D_COOLANT_DIAG
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KRUPAS-1.9D-COOLANT-DIAG
+          path: |
+            firmware/KRUPAS_OPEL_DISPLAY_1_9D_COOLANT_DIAG
+            firmware/COOLANT_DIAG_README_PL.md
+            esp-build
+          if-no-files-found: error
