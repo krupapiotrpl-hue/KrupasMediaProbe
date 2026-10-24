@@ -198,7 +198,26 @@ public class MainActivity extends Activity {
             }
         });
         buttons.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        root.addView(buttons);
+        // Four compact buttons remain on one row, even on narrow K706 screens.
+        // Scroll horizontally instead of clipping the diagnostic copy action.
+        android.widget.HorizontalScrollView buttonStrip =
+                new android.widget.HorizontalScrollView(this);
+        buttonStrip.setHorizontalScrollBarEnabled(false);
+        buttonStrip.setFillViewport(false);
+        for (int index = 0; index < buttons.getChildCount(); index++) {
+            View item = buttons.getChildAt(index);
+            if (item instanceof Button) {
+                Button button = (Button) item;
+                button.setMinWidth(0);
+                button.setMinimumWidth(0);
+                button.setPadding(8, button.getPaddingTop(), 8, button.getPaddingBottom());
+                button.setSingleLine(true);
+            }
+        }
+        buttonStrip.addView(buttons);
+        root.addView(buttonStrip, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
 
         ScrollView sv = new ScrollView(this);
         diagnosticScroll = sv;
