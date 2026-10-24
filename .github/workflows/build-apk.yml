@@ -78,6 +78,9 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.7-AUTO.apk
+          test -s KRUPAS-Media-Probe-0.6.7-AUTO.apk
+          ls -lh KRUPAS-Media-Probe-0.6.7-AUTO.apk
+          sha256sum KRUPAS-Media-Probe-0.6.7-AUTO.apk
 
       - uses: actions/upload-artifact@v4
         with:
