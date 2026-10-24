@@ -77,6 +77,9 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk | tee apk-badging.txt
+          grep -q "versionName=\x270.6.7-AUTO\x27" apk-badging.txt
+          grep -q "name=\x27pl.krupapiotr.mediaprobe\x27" apk-badging.txt
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.7-AUTO.apk
           test -s KRUPAS-Media-Probe-0.6.7-AUTO.apk
           python3 - <<'PY'
