@@ -8,6 +8,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.media.MediaMetadata;
+import android.media.AudioManager;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
@@ -95,6 +96,10 @@ public class MediaBridgeService extends Service {
 
     private void pollAndSend() {
         String visibleStation = RdsAccessibilityService.readVisibleStation();
+        AudioManager audio = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        int audioMode = audio == null ? AudioManager.MODE_NORMAL : audio.getMode();
+        boolean callAudio = audioMode == AudioManager.MODE_IN_CALL
+                || audioMode == AudioManager.MODE_IN_COMMUNICATION;
         String radioPackage = RdsAccessibilityService.stationPackage;
         MediaSessionManager manager =
                 (MediaSessionManager) getSystemService(Context.MEDIA_SESSION_SERVICE);
@@ -159,8 +164,18 @@ public class MediaBridgeService extends Service {
         // Do not show the old owner's title during the new owner's grace period.
         if (selector.changed) displayLease = new DisplayLease();
         String candidate = selected == null ? "" : DisplayText.format(selected.pkg, selected.title);
+        String pkg = selected == null ? foreground : selected.pkg;
+        String normalized = pkg == null ? "" : pkg.toLowerCase(java.util.Locale.ROOT);
+        String category = callAudio ? "TELEFON / BT - AUDIO" :
+                normalized.contains("youtube") ? "YOUTUBE" :
+                normalized.contains("maps") || normalized.contains("waze") || normalized.contains("here") ? "NAWIGACJA - BEZ MANEWRU" :
+                normalized.contains("radio") || normalized.contains(".fm") ? "RADIO" :
+                selected != null ? "MP3 / MEDIA" : "BRAK";
         observedAt = SystemClock.elapsedRealtime();
-        diagnostic = "BIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
+        diagnostic = "ROZPOZNANE ŹRÓDŁO: " + category
+                + "\nAUDIO MODE: " + audioMode
+                + "\nUWAGA: tryb audio nie potwierdza numeru ani rozmówcy"
+                + "\nBIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
                 + "\nBIEŻĄCY TYTUŁ: " + (candidate.isEmpty() ? "brak metadanych" : candidate);
         publishCandidate(candidate);
     }
@@ -271,7 +286,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("Krupas Media Pro 0.6.6 AUTO – MP3 FIX")
+                .setContentTitle("Krupas Media Pro 0.6.7 AUTO")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)
