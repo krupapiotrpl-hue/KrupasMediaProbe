@@ -292,7 +292,10 @@ public class MainActivity extends Activity {
         s.append("MP3 → ikona mediów, tytuł utworu\n");
         s.append("NAWIGACJA → ikona nawigacji, manewr (gdy dostępny)\n");
         s.append("TELEFON → ikona słuchawki + kontakt / numer (gdy dostępny)\n");
-        s.append("Stan ikon: planowana obsługa ESP32; brak potwierdzenia ramek CAN.\n\n");
+        s.append("PROTOKÓŁ ESP32: odbiór zwykłego tekstu UTF-8 przez BLE.\n");
+        s.append("IKONY: powyższa lista jest planem, nie potwierdzonym wyświetlaniem.\n");
+        s.append("TELEFON: kontakt/numer tylko jeśli Android udostępni powiadomienie o rozmowie.\n");
+        s.append("Do uruchomienia ikon konieczna będzie zgodna obsługa w ESP32 i test CAN.\n\n");
         s.append(readMediaSessions());
         s.append("\n\nOSTATNIA PRÓBKA EKRANU (HISTORIA)\n")
                 .append(RdsAccessibilityService.diagnostic);
