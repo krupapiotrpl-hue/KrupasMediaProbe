@@ -177,7 +177,16 @@ public class MediaBridgeService extends Service {
                 + "\nUWAGA: tryb audio nie potwierdza numeru ani rozmówcy"
                 + "\nBIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
                 + "\nBIEŻĄCY TYTUŁ: " + (candidate.isEmpty() ? "brak metadanych" : candidate);
-        publishCandidate(candidate);
+        // During an active call, never overwrite the intended phone display
+        // with stale media text. Phone metadata/icons require a separately
+        // validated protocol; do not fabricate a caller name or glyph.
+        if (callAudio) {
+            diagnostic += "\\nWYŚWIETLACZ: media wstrzymane podczas rozmowy"
+                    + "\\nROZMÓWCA: brak potwierdzonego dostępu do danych";
+            publishCandidate("");
+        } else {
+            publishCandidate(candidate);
+        }
     }
 
     private void publishCandidate(String candidate) {
