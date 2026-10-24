@@ -181,8 +181,8 @@ public class MediaBridgeService extends Service {
         // with stale media text. Phone metadata/icons require a separately
         // validated protocol; do not fabricate a caller name or glyph.
         if (callAudio) {
-            diagnostic += "\\nWYŚWIETLACZ: media wstrzymane podczas rozmowy"
-                    + "\\nROZMÓWCA: brak potwierdzonego dostępu do danych";
+            diagnostic += "\nWYŚWIETLACZ: media wstrzymane podczas rozmowy"
+                    + "\nROZMÓWCA: brak potwierdzonego dostępu do danych";
             publishCandidate("");
         } else {
             publishCandidate(candidate);
