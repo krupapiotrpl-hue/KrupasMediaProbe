@@ -41,6 +41,31 @@ public class MediaProbeNotificationService extends NotificationListenerService {
             return title;
         } catch (SecurityException ignored) { return ""; }
     }
+    /** Caller information is only a hint from a current CALL notification.
+     * Some head units expose no such notification; never infer a contact. */
+    static String currentCallLabel() {
+        if (instance == null) return "";
+        try {
+            StatusBarNotification[] notifications = instance.getActiveNotifications();
+            if (notifications == null) return "";
+            StatusBarNotification latest = null;
+            String label = "";
+            for (StatusBarNotification sbn : notifications) {
+                Notification n = sbn.getNotification();
+                if (n == null || n.extras == null
+                        || !Notification.CATEGORY_CALL.equals(n.category)) continue;
+                String candidate = text(n.extras, Notification.EXTRA_TITLE).trim();
+                if (candidate.isEmpty()) continue;
+                if (latest == null || sbn.getPostTime() > latest.getPostTime()) {
+                    latest = sbn;
+                    label = candidate;
+                }
+            }
+            return label;
+        } catch (SecurityException ex) {
+            return "";
+        }
+    }
     private static String text(Bundle b, String key) {
         CharSequence s = b == null ? null : b.getCharSequence(key);
         return s == null ? "" : s.toString();
