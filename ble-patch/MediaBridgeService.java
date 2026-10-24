@@ -181,8 +181,11 @@ public class MediaBridgeService extends Service {
         // with stale media text. Phone metadata/icons require a separately
         // validated protocol; do not fabricate a caller name or glyph.
         if (callAudio) {
+            String caller = MediaProbeNotificationService.currentCallLabel();
             diagnostic += "\nWYŚWIETLACZ: media wstrzymane podczas rozmowy"
-                    + "\nROZMÓWCA: brak potwierdzonego dostępu do danych";
+                    + "\nROZMÓWCA (powiadomienie BT): "
+                    + (caller.isEmpty() ? "brak udostępnionej nazwy / numeru" : caller)
+                    + "\nIKONA SŁUCHAWKI: oczekuje na protokół ESP32";
             // Bypass the 2.5 s missing-title grace period for calls.
             // Clear queued BLE text immediately so an old media title cannot
             // reappear after reconnect while the phone is active.
