@@ -34,6 +34,8 @@ jobs:
           java -cp test-classes pl.krupapiotr.mediaprobe.UiAndBleTest
           java -cp test-classes pl.krupapiotr.mediaprobe.MediaSourcesTest
           java -cp test-classes pl.krupapiotr.mediaprobe.DisplayLeaseTest
+          javac -d test-classes ble-patch/IconProtocol.java tests/IconProtocolTest.java
+          java -cp test-classes pl.krupapiotr.mediaprobe.IconProtocolTest
           python3 tests/test_firmware_expiry.py
 
       - name: Rozpakuj projekt
