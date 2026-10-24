@@ -183,7 +183,13 @@ public class MediaBridgeService extends Service {
         if (callAudio) {
             diagnostic += "\nWYŚWIETLACZ: media wstrzymane podczas rozmowy"
                     + "\nROZMÓWCA: brak potwierdzonego dostępu do danych";
-            publishCandidate("");
+            // Bypass the 2.5 s missing-title grace period for calls.
+            // Clear queued BLE text immediately so an old media title cannot
+            // reappear after reconnect while the phone is active.
+            displayLease = new DisplayLease();
+            if (ble == null) ble = BleDisplayClient.get(this);
+            ble.clearText();
+            updateNotification("Rozmowa: multimedia wstrzymane");
         } else {
             publishCandidate(candidate);
         }
