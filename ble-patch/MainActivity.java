@@ -267,6 +267,13 @@ public class MainActivity extends Activity {
                 )
                 .append("\n\n");
 
+        s.append("IKONY / ŹRÓDŁA — DIAGNOSTYKA 0.6.7\n");
+        s.append("RADIO → ikona radia, RDS / częstotliwość\n");
+        s.append("YOUTUBE → ikona mediów, tytuł filmu\n");
+        s.append("MP3 → ikona mediów, tytuł utworu\n");
+        s.append("NAWIGACJA → ikona nawigacji, manewr (gdy dostępny)\n");
+        s.append("TELEFON → ikona słuchawki + kontakt / numer (gdy dostępny)\n");
+        s.append("Stan ikon: planowana obsługa ESP32; brak potwierdzenia ramek CAN.\n\n");
         s.append(readMediaSessions());
         s.append("\n\nOSTATNIA PRÓBKA EKRANU (HISTORIA)\n")
                 .append(RdsAccessibilityService.diagnostic);
