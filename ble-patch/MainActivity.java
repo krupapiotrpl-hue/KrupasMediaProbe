@@ -29,6 +29,7 @@ import java.util.List;
 
 public class MainActivity extends Activity {
     private TextView out;
+    private ScrollView diagnosticScroll;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean receiverRegistered;
     private BleDisplayClient bleDisplay;
@@ -115,7 +116,7 @@ public class MainActivity extends Activity {
         root.setPadding(24, 18, 24, 18);
 
         TextView title = new TextView(this);
-        title.setText("KRUPAS MEDIA PROBE 0.6.6 AUTO – MP3 FIX — K706");
+        title.setText("KRUPAS MEDIA PROBE 0.6.7 AUTO — K706");
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
@@ -183,8 +184,6 @@ public class MainActivity extends Activity {
         });
         buttons.addView(refresh);
 
-        root.addView(buttons);
-
         Button copy = new Button(this);
         copy.setText("KOPIUJ DIAGNOSTYKĘ");
         copy.setOnClickListener(v -> {
@@ -193,14 +192,16 @@ public class MainActivity extends Activity {
                     getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null && out != null) {
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
-                        "Krupas Media 0.6.6 — diagnostyka", out.getText()));
+                        "Krupas Media 0.6.7 — diagnostyka", out.getText()));
                 android.widget.Toast.makeText(this, "Diagnostyka skopiowana — możesz wkleić ją do rozmowy",
                         android.widget.Toast.LENGTH_LONG).show();
             }
         });
-        root.addView(copy);
+        buttons.addView(copy, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(buttons);
 
         ScrollView sv = new ScrollView(this);
+        diagnosticScroll = sv;
 
         out = new TextView(this);
         out.setTextSize(17);
@@ -276,9 +277,12 @@ public class MainActivity extends Activity {
                         "HISTORYCZNY ODCZYT — NIE POTWIERDZA AKTUALNEGO ŹRÓDŁA\n" + MediaStateStore.dump(this)
                 );
 
-        out.setText(
-                s.toString()
-        );
+        String updated = s.toString();
+        if (!updated.contentEquals(out.getText())) {
+            int savedY = diagnosticScroll == null ? 0 : diagnosticScroll.getScrollY();
+            out.setText(updated);
+            if (diagnosticScroll != null) diagnosticScroll.post(() -> diagnosticScroll.scrollTo(0, savedY));
+        }
     }
 
     private boolean isNotificationAccessEnabled() {
