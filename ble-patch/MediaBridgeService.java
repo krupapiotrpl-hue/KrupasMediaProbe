@@ -193,6 +193,13 @@ public class MediaBridgeService extends Service {
             if (ble == null) ble = BleDisplayClient.get(this);
             ble.clearText();
             updateNotification("Rozmowa: multimedia wstrzymane");
+        } else if ("NAWIGACJA - BEZ MANEWRU".equals(category)) {
+            // Navigation must not hold the display with a permanent label.
+            // Maneuver instructions will be added once their source is verified.
+            displayLease = new DisplayLease();
+            if (ble == null) ble = BleDisplayClient.get(this);
+            ble.clearText();
+            updateNotification("Nawigacja: oczekiwanie na manewr");
         } else {
             publishCandidate(candidate);
         }
