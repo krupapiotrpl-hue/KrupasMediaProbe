@@ -1,7 +1,7 @@
-name: Zbuduj instalator APK 0.6.6 TEST
+name: Zbuduj instalator APK 0.6.7 AUTO
 on:
   push:
-    branches: [fix/0.6.6-rds-diagnostics]
+    branches: [fix/0.6.7-auto]
   workflow_dispatch:
 
 permissions:
@@ -44,7 +44,7 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw KRUPAS MEDIA 0.6.6 TEST
+      - name: Wstaw KRUPAS MEDIA 0.6.7 AUTO
         run: |
           cp ble-patch/DisplayText.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
           cp ble-patch/RadioRdsCache.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
@@ -77,31 +77,11 @@ jobs:
       - name: Sprawdz podpis instalatora
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.6-AUTO-MP3-FIX.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.7-AUTO.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.6.6-AUTO-MP3-FIX
-          path: KRUPAS-Media-Probe-0.6.6-AUTO-MP3-FIX.apk
-          if-no-files-found: error
-
-  firmware:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: arduino/setup-arduino-cli@v2
-      - name: Install ESP32 core
-        run: |
-          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-      - name: Compile ESP32-S3 firmware
-        run: arduino-cli compile --fqbn esp32:esp32:esp32s3 --output-dir esp-build firmware/KRUPAS_OPEL_DISPLAY_v1_9f_TEST_EXPIRY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ESP32S3-1.9f-TEST-EXPIRY
-          path: |
-            firmware/KRUPAS_OPEL_DISPLAY_v1_9f_TEST_EXPIRY
-            esp-build
+          name: KRUPAS-Media-Probe-0.6.7-AUTO
+          path: KRUPAS-Media-Probe-0.6.7-AUTO.apk
           if-no-files-found: error
 
