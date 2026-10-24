@@ -79,6 +79,16 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.7-AUTO.apk
           test -s KRUPAS-Media-Probe-0.6.7-AUTO.apk
+          python3 - <<'PY'
+          import zipfile
+          apk = "KRUPAS-Media-Probe-0.6.7-AUTO.apk"
+          with zipfile.ZipFile(apk) as z:
+              files = set(z.namelist())
+              assert "AndroidManifest.xml" in files, "APK missing manifest"
+              assert any(x.endswith(".dex") for x in files), "APK missing DEX bytecode"
+              assert "resources.arsc" in files, "APK missing resources"
+          print("APK structure: manifest, DEX, resources present")
+          PY
           ls -lh KRUPAS-Media-Probe-0.6.7-AUTO.apk
           sha256sum KRUPAS-Media-Probe-0.6.7-AUTO.apk
 
