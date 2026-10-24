@@ -2,3 +2,4 @@ BLE 0.2 build trigger
 
 KRUPAS MEDIA PRO 0.6.7 AUTO — build requested 2026-10-24.
 KRUPAS MEDIA PRO 0.6.7 AUTO — verified rebuild requested 2026-10-24 11:31 Europe/Warsaw; preserve existing version.
+KRUPAS MEDIA PRO 0.6.7 AUTO — fresh build with automated Java tests, Gradle assembly, APK signature/version/structure checks; 2026-10-24 repeat verification #2.
