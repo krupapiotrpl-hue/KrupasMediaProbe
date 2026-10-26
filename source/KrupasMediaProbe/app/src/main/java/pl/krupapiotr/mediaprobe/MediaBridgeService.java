@@ -33,7 +33,7 @@ public final class MediaBridgeService extends Service {
     private String oldMedia="",oldFreq="",oldStation="",oldSource="";
     private String lastPlayingTitle="", lastPlayingPkg="";
     private long lastPlayingSeen;
-    private static final long MEDIA_HOLD_MS = 20000L;
+    private static final long MEDIA_HOLD_MS = 90000L;
     private long sentMedia, sentRadio, sentStation;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
@@ -102,6 +102,7 @@ public final class MediaBridgeService extends Service {
         if (media.title.isEmpty()) media = fallbackLegacy(now);
         if (media.title.isEmpty()) media = fallbackVisibleMp3(now, radioSeen);
         if (media.title.isEmpty()) media = fallbackNotification(now, radioSeen);
+        media.title=SourceRouter.clean(media.title);
         // Keep the last title through short UI/navigation transitions.
         // Explicit paused/stopped broadcasts invalidate this cache below.
         if (!media.title.isEmpty()) {
