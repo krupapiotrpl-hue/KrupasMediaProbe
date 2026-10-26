@@ -30,7 +30,10 @@ public final class MediaBridgeService extends Service {
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
     private boolean registered;
-    private String oldMedia="",oldFreq="",oldStation="";
+    private String oldMedia="",oldFreq="",oldStation="",oldSource="";
+    private String lastPlayingTitle="", lastPlayingPkg="";
+    private long lastPlayingSeen;
+    private static final long MEDIA_HOLD_MS = 20000L;
     private long sentMedia, sentRadio, sentStation;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
@@ -41,7 +44,7 @@ public final class MediaBridgeService extends Service {
         super.onCreate();
         foreground();
         ble=new BleDisplayClient(this,()->{
-            oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            oldMedia="";oldFreq="";oldStation="";oldSource="";sentMedia=sentRadio=sentStation=0;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
@@ -99,6 +102,19 @@ public final class MediaBridgeService extends Service {
         if (media.title.isEmpty()) media = fallbackLegacy(now);
         if (media.title.isEmpty()) media = fallbackVisibleMp3(now, radioSeen);
         if (media.title.isEmpty()) media = fallbackNotification(now, radioSeen);
+        // Keep the last title through short UI/navigation transitions.
+        // Explicit paused/stopped broadcasts invalidate this cache below.
+        if (!media.title.isEmpty()) {
+            getSharedPreferences("krupas_legacy",0).edit().putBoolean("explicit_stop",false).apply();
+            lastPlayingTitle=media.title;
+            lastPlayingPkg=media.pkg;
+            lastPlayingSeen=now;
+        } else if (!lastPlayingTitle.isEmpty() && now-lastPlayingSeen < MEDIA_HOLD_MS
+                && !getSharedPreferences("krupas_legacy",0).getBoolean("explicit_stop",false)) {
+            media.title=lastPlayingTitle;
+            media.pkg=lastPlayingPkg;
+            media.state="HOLD";
+        }
 
         diag("media_status", media.pkg + " / " + media.title + " / " + media.state);
         diag("radio_status", radio.getString("pkg", "") + " / " + freq +
@@ -117,6 +133,7 @@ public final class MediaBridgeService extends Service {
         if (!ble.ready()) return;
 
         if (preferRadio) {
+            lastPlayingTitle=""; lastPlayingSeen=0;
             if (!oldMedia.isEmpty()) {
                 ble.send("MEDIA:STOP");
                 oldMedia = "";
@@ -130,6 +147,10 @@ public final class MediaBridgeService extends Service {
                 // Invalidate previous station only on actual retuning.
                 ble.send("CLEAR:RDS");
                 oldStation = "";
+            }
+            if (!"FM".equals(oldSource)) {
+                ble.send("SOURCE:FM");
+                oldSource="FM";
             }
             if (!freq.isEmpty() && (frequencyChanged || now - sentRadio >= 10000)) {
                 ble.send("FM:FM " + freq);
@@ -157,6 +178,11 @@ public final class MediaBridgeService extends Service {
                 oldStation = "";
                 sentRadio = sentStation = 0;
             }
+            String source=SourceRouter.sourceTag(media.pkg);
+            if (!source.equals(oldSource)) {
+                ble.send("SOURCE:"+source);
+                oldSource=source;
+            }
             if (!media.title.equals(oldMedia) || now - sentMedia >= 10000) {
                 ble.send("TITLE:" + media.title);
                 oldMedia = media.title;
@@ -164,7 +190,8 @@ public final class MediaBridgeService extends Service {
             }
         }
         else {
-            // Stop immediately once all live music sources have disappeared.
+            oldSource="";
+            // Clear after the bounded hold window or an explicit stop.
             if (!oldMedia.isEmpty()) {
                 ble.send("MEDIA:STOP");
                 oldMedia = "";
@@ -241,7 +268,8 @@ public final class MediaBridgeService extends Service {
             boolean playing=!"false".equalsIgnoreCase(state) && !"0".equals(state) && !"paused".equalsIgnoreCase(state);
             getSharedPreferences("krupas_legacy",0).edit().putLong("seen",System.currentTimeMillis())
                     .putString("title",title).putString("artist",artist).putString("pkg",i.getPackage()==null?"legacy":i.getPackage())
-                    .putBoolean("playing",playing).apply();
+                    .putBoolean("playing",playing).putBoolean("explicit_stop",!playing).apply();
+            if(!playing){lastPlayingTitle="";lastPlayingSeen=0;}
         }
     };
     private static String first(Bundle b,String... keys){for(String k:keys){Object v=b.get(k);if(v!=null)return String.valueOf(v);}return "";}
