@@ -44,6 +44,15 @@ final class SourceRouter {
                 p.contains("vlc") || p.contains("audiobook");
     }
 
+    // Source tags travel as dedicated BLE messages, never inside scrolling titles.
+    static String sourceTag(String pkg) {
+        String p = pkg == null ? "" : pkg.toLowerCase(Locale.ROOT);
+        if (p.contains("youtube")) return "YT";
+        if (isRadioPackage(pkg)) return "FM";
+        if (p.contains("bluetooth") || p.contains("a2dp")) return "BT";
+        return "MP3";
+    }
+
     static boolean validStation(String s) {
         s = clean(s);
         if (s.length() < 3 || s.length() > 34 || frequency(s).length() > 0) return false;
