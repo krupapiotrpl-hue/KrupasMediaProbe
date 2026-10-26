@@ -13,7 +13,10 @@ final class SourceRouter {
         if (v == null) return "";
         String s = v.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim();
         if (s.equalsIgnoreCase("unknown") || s.equalsIgnoreCase("<unknown>") ||
-                s.equalsIgnoreCase("null") || s.equalsIgnoreCase("unknown title")) return "";
+                s.equalsIgnoreCase("null") || s.equalsIgnoreCase("unknown title") ||
+                s.equalsIgnoreCase("none") || s.equalsIgnoreCase("todo") ||
+                s.equalsIgnoreCase("navradio+") || s.equalsIgnoreCase("youtube") ||
+                s.equalsIgnoreCase("filtry") || s.equalsIgnoreCase("zminimalizowany odtwarzacz")) return "";
         return s.length() > 90 ? s.substring(0, 90) : s;
     }
 
