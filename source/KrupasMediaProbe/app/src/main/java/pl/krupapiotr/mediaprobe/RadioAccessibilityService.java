@@ -97,7 +97,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
             String title = "";
             for (String item : strings) {
                 String u = item.toUpperCase(java.util.Locale.ROOT);
-                if (item.length() < 5 || item.length() > 90 || !item.matches(".*[\\p{L}].*")) continue;
+                if (SourceRouter.clean(item).isEmpty() || item.length() < 5 || item.length() > 90 || !item.matches(".*[\\p{L}].*")) continue;
                 if (u.matches(".*\\b(?:MP3|USB|SD|MUSIC|LOCAL|ALL SONGS|PLAYLIST|ALBUM|ARTIST|REPEAT|SHUFFLE|NEXT|BACK|PLAY|PAUSE|STOP|NOW PLAYING|FOLDER|FAVORITES|SETTINGS)\\b.*")) continue;
                 if (item.matches("^[0-9:./ -]+$")) continue;
                 title = item;
