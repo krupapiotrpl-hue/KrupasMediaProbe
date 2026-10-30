@@ -1,7 +1,7 @@
 name: Zbuduj instalator APK 0.6.8 AUTO
 on:
   push:
-    branches: [fix/0.6.8-auto]
+    branches: [fix/0.6.8-kp1-icons]
   workflow_dispatch:
 
 permissions:
