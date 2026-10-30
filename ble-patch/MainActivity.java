@@ -116,7 +116,7 @@ public class MainActivity extends Activity {
         root.setPadding(24, 18, 24, 18);
 
         TextView title = new TextView(this);
-        title.setText("KRUPAS MEDIA PROBE 0.6.7 AUTO — K706");
+        title.setText("KRUPAS MEDIA PROBE 0.6.8 AUTO — K706");
         title.setTextSize(24);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
@@ -192,7 +192,7 @@ public class MainActivity extends Activity {
                     getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null && out != null) {
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
-                        "Krupas Media 0.6.7 — diagnostyka", out.getText()));
+                        "Krupas Media 0.6.8 — diagnostyka", out.getText()));
                 android.widget.Toast.makeText(this, "Diagnostyka skopiowana — możesz wkleić ją do rozmowy",
                         android.widget.Toast.LENGTH_LONG).show();
             }
@@ -286,7 +286,7 @@ public class MainActivity extends Activity {
                 )
                 .append("\n\n");
 
-        s.append("IKONY / ŹRÓDŁA — DIAGNOSTYKA 0.6.7\n");
+        s.append("IKONY / ŹRÓDŁA — DIAGNOSTYKA 0.6.8\n");
         s.append("RADIO → ikona radia, RDS / częstotliwość\n");
         s.append("YOUTUBE → ikona mediów, tytuł filmu\n");
         s.append("MP3 → ikona mediów, tytuł utworu\n");
