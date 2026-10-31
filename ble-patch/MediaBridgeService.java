@@ -35,6 +35,9 @@ public class MediaBridgeService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
     private DisplayLease displayLease = new DisplayLease();
+    private boolean phoneEventActive = false;
+    private boolean phoneStateInitialized = false;
+    private String lastCallerSent = "";
     private final SourceSelector selector = new SourceSelector();
 
     static void start(Context context) {
@@ -100,6 +103,9 @@ public class MediaBridgeService extends Service {
         int audioMode = audio == null ? AudioManager.MODE_NORMAL : audio.getMode();
         boolean callAudio = audioMode == AudioManager.MODE_IN_CALL
                 || audioMode == AudioManager.MODE_IN_COMMUNICATION;
+        String callerHint = MediaProbeNotificationService.currentCallLabel();
+        // Some K706 phone screens signal a call notification before audio mode changes.
+        boolean callObserved = callAudio || !callerHint.isEmpty();
         String radioPackage = RdsAccessibilityService.stationPackage;
         MediaSessionManager manager =
                 (MediaSessionManager) getSystemService(Context.MEDIA_SESSION_SERVICE);
@@ -166,7 +172,7 @@ public class MediaBridgeService extends Service {
         String candidate = selected == null ? "" : DisplayText.format(selected.pkg, selected.title);
         String pkg = selected == null ? foreground : selected.pkg;
         String normalized = pkg == null ? "" : pkg.toLowerCase(java.util.Locale.ROOT);
-        String category = callAudio ? "TELEFON / BT - AUDIO" :
+        String category = callObserved ? "TELEFON / BT - AUDIO" :
                 normalized.contains("youtube") ? "YOUTUBE" :
                 normalized.contains("maps") || normalized.contains("waze") || normalized.contains("here") ? "NAWIGACJA - BEZ MANEWRU" :
                 normalized.contains("radio") || normalized.contains(".fm") ? "RADIO" :
@@ -177,29 +183,36 @@ public class MediaBridgeService extends Service {
                 + "\nUWAGA: tryb audio nie potwierdza numeru ani rozmówcy"
                 + "\nBIEŻĄCE ŹRÓDŁO: " + (selected == null ? "brak" : selected.pkg)
                 + "\nBIEŻĄCY TYTUŁ: " + (candidate.isEmpty() ? "brak metadanych" : candidate);
-        // During an active call, never overwrite the intended phone display
-        // with stale media text. Phone metadata/icons require a separately
-        // validated protocol; do not fabricate a caller name or glyph.
-        if (callAudio) {
-            String caller = MediaProbeNotificationService.currentCallLabel();
-            diagnostic += "\nWYŚWIETLACZ: media wstrzymane podczas rozmowy"
-                    + "\nROZMÓWCA (powiadomienie BT): "
-                    + (caller.isEmpty() ? "brak udostępnionej nazwy / numeru" : caller)
-                    + "\nIKONA SŁUCHAWKI: oczekuje na protokół ESP32";
-            // Bypass the 2.5 s missing-title grace period for calls.
-            // Clear queued BLE text immediately so an old media title cannot
-            // reappear after reconnect while the phone is active.
-            displayLease = new DisplayLease();
+        // Phone messages have priority over stale media. The ESP restores the
+        // saved source after CALL_END; this is NOT a regular media title.
+        if (callObserved) {
+            String caller = callerHint.isEmpty() ? "TELEFON" : callerHint;
             if (ble == null) ble = BleDisplayClient.get(this);
-            ble.clearText();
-            updateNotification("Rozmowa: multimedia wstrzymane");
-        } else if ("NAWIGACJA - BEZ MANEWRU".equals(category)) {
-            // Navigation must not hold the display with a permanent label.
-            // Maneuver instructions will be added once their source is verified.
+            if (!phoneEventActive || !caller.equals(lastCallerSent)) {
+                ble.beginCall(caller);
+                lastCallerSent = caller;
+            }
+            phoneEventActive = true;
+            phoneStateInitialized = true;
             displayLease = new DisplayLease();
-            if (ble == null) ble = BleDisplayClient.get(this);
-            ble.clearText();
-            updateNotification("Nawigacja: oczekiwanie na manewr");
+            diagnostic += "\nCALL DETECTED: " + (callAudio ? "audio" : "powiadomienie")
+                    + "\nROZMOWCA: " + (callerHint.isEmpty() ? "niedostepny - TELEFON" : callerHint)
+                    + "\nBLE: CALL wyslany lub oczekuje na polaczenie";
+            updateNotification("Rozmowa: przekazywanie CALL do ESP");
+        } else {
+            // Also reset any stale ESP call after an Android service restart.
+            if (phoneEventActive || !phoneStateInitialized) {
+                if (ble == null) ble = BleDisplayClient.get(this);
+                ble.endCall();
+                lastCallerSent = "";
+            }
+            phoneEventActive = false;
+            phoneStateInitialized = true;
+            if ("NAWIGACJA - BEZ MANEWRU".equals(category)) {
+                displayLease = new DisplayLease();
+                if (ble == null) ble = BleDisplayClient.get(this);
+                ble.clearText();
+                updateNotification("Nawigacja: oczekiwanie na manewr");
         } else {
             publishCandidate(candidate);
         }
