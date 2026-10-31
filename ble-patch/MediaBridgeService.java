@@ -213,8 +213,9 @@ public class MediaBridgeService extends Service {
                 if (ble == null) ble = BleDisplayClient.get(this);
                 ble.clearText();
                 updateNotification("Nawigacja: oczekiwanie na manewr");
-        } else {
-            publishCandidate(candidate);
+            } else {
+                publishCandidate(candidate);
+            }
         }
     }
 
