@@ -54,9 +54,9 @@ public final class MediaBridgeService extends Service {
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
         if(intent!=null && ACTION_TEST_FM.equals(intent.getAction())){
-            ble.send("FM:107.0"); ble.send("RDS:TEST FM");
+            ble.send("SRC:RADIO|TEST FM");
         }
-        if(intent!=null && ACTION_TEST_MP3.equals(intent.getAction())) ble.send("TITLE:KRUPAS TEST MP3");
+        if(intent!=null && ACTION_TEST_MP3.equals(intent.getAction())) ble.send("SRC:MP3|KRUPAS TEST MP3");
         return START_STICKY;
     }
     @Override public void onDestroy(){
@@ -152,67 +152,32 @@ public final class MediaBridgeService extends Service {
             sentMedia = sentRadio = sentStation = 0L;
         }
 
+        // ESP 1.9x18 accepts SRC:<source>|<text>, not TITLE/RDS/CLEAR.
+        // Send single source+title records, refreshed while active.
         if (preferRadio) {
-            if (!oldMedia.isEmpty()) {
-                ble.send("MEDIA:STOP");
-                oldMedia = "";
-                sentMedia = 0;
-            }
-
-            final boolean frequencyChanged = !freq.equals(oldFreq);
-            final boolean stationChanged = !station.equals(oldStation);
-
-            if (frequencyChanged && !oldFreq.isEmpty()) {
-                // Invalidate previous station only on actual retuning.
-                ble.send("CLEAR:RDS");
-                oldStation = "";
-            }
-            if (!freq.isEmpty() && (frequencyChanged || now - sentRadio >= 10000)) {
-                ble.send("FM:FM " + freq);
-                oldFreq = freq;
-                sentRadio = now;
-            } else if (freq.isEmpty() && !oldFreq.isEmpty()) {
-                ble.send("CLEAR:FM");
-                oldFreq = "";
-            }
-
-            if (!station.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
-                ble.send("RDS:" + station);
-                oldStation = station;
-                sentStation = now;
-            } else if (station.isEmpty() && !oldStation.isEmpty()) {
-                ble.send("CLEAR:RDS");
-                oldStation = "";
-            }
-        }
-        else if (!media.title.isEmpty()) {
-            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
-                ble.send("CLEAR:FM");
-                ble.send("CLEAR:RDS");
-                oldFreq = "";
-                oldStation = "";
-                sentRadio = sentStation = 0;
-            }
-            if (!media.title.equals(oldMedia) || now - sentMedia >= 10000) {
-                ble.send("TITLE:" + media.title);
-                oldMedia = media.title;
+            String radioText = !station.isEmpty() ? station : "FM " + freq;
+            String record = "SRC:RADIO|" + radioText;
+            if (!record.equals(oldMedia) || now - sentMedia >= 5000) {
+                ble.send(record);
+                oldMedia = record;
                 sentMedia = now;
             }
-        }
-        else {
-            // Stop immediately once all live music sources have disappeared.
-            if (!oldMedia.isEmpty()) {
-                ble.send("MEDIA:STOP");
-                oldMedia = "";
-                sentMedia = 0;
+        } else if (!media.title.isEmpty()) {
+            String pkg = media.pkg == null ? "" : media.pkg.toLowerCase(java.util.Locale.ROOT);
+            String source = pkg.contains("youtube") ? "YT" :
+                    (pkg.contains("bluetooth") ? "BT" : "MP3");
+            String record = "SRC:" + source + "|" + media.title;
+            if (!record.equals(oldMedia) || now - sentMedia >= 5000) {
+                ble.send(record);
+                oldMedia = record;
+                sentMedia = now;
             }
-            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
-                ble.send("CLEAR:FM");
-                ble.send("CLEAR:RDS");
-                oldFreq = oldStation = "";
-                sentRadio = sentStation = 0;
-            }
+        } else if (!oldMedia.isEmpty()) {
+            ble.send("SRC:MP3|");
+            oldMedia = "";
+            sentMedia = 0L;
         }
+
     }
     private MediaResult findPlayingMedia(){
         MediaResult best=new MediaResult();
