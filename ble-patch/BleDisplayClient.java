@@ -46,6 +46,9 @@ final class BleDisplayClient {
     private boolean discoveryStarted;
     private long gattStartedAt;
     private String pending = "";
+    // Phone commands have priority over normal media titles until GATT ACK.
+    private String priorityCommand = "";
+    private String activeCallCommand = "";
     private String lastSent = "";
     private long lastConfirmedAt;
     private String inFlight = "";
@@ -139,7 +142,33 @@ final class BleDisplayClient {
         synchronized (this) {
             closeCurrentGattLocked();
             pending = "";
+            priorityCommand = "";
+            activeCallCommand = "";
         }
+    }
+
+    // ESP 1.9x17+ understands the legacy commands even when BLE MTU is 23.
+    // The caller label is optional; using ASCII TELEFON is a safe fallback.
+    void beginCall(String caller) {
+        String label = clean(caller);
+        if (label.isEmpty()) label = "TELEFON";
+        String command = "CALL:" + label;
+        synchronized (this) {
+            activeCallCommand = command;
+            priorityCommand = command;
+            pending = ""; // never restore a stale media title during a call
+        }
+        if (isConnected()) writePending();
+        else start();
+    }
+
+    void endCall() {
+        synchronized (this) {
+            activeCallCommand = "";
+            priorityCommand = "CALL_END";
+        }
+        if (isConnected()) writePending();
+        else start();
     }
 
     void sendText(String text) {
@@ -259,6 +288,8 @@ final class BleDisplayClient {
                 gattStartedAt = 0;
                 rx.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
                 lastSent = "";
+                // Reannounce an ongoing call after a BLE reconnect.
+                if (!activeCallCommand.isEmpty()) priorityCommand = activeCallCommand;
             }
 
             writePending();
@@ -272,6 +303,10 @@ final class BleDisplayClient {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     lastSent = inFlight;
                     lastConfirmedAt = SystemClock.elapsedRealtime();
+                    if (!priorityCommand.isEmpty()
+                            && BlePayload.fit(priorityCommand, maxWriteBytes).equals(inFlight)) {
+                        priorityCommand = "";
+                    }
                 }
                 inFlight = "";
             }
@@ -335,9 +370,12 @@ final class BleDisplayClient {
 
     private synchronized void writePending() {
         if (!hasPermissions() || gatt == null || rx == null || !inFlight.isEmpty()) return;
-        if (pending.isEmpty()) return;
-        String payload = BlePayload.fit(pending, maxWriteBytes);
-        if (payload.equals(lastSent) && (payload.equals(" ")
+        boolean control = !priorityCommand.isEmpty();
+        String target = control ? priorityCommand : pending;
+        if (target.isEmpty()) return;
+        String payload = BlePayload.fit(target, maxWriteBytes);
+        // A phone state transition must not be suppressed by title deduplication.
+        if (!control && payload.equals(lastSent) && (payload.equals(" ")
                 || SystemClock.elapsedRealtime() - lastConfirmedAt < 2000)) return;
         byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
         try {
