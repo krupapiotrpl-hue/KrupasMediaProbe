@@ -44,7 +44,8 @@ public final class MediaBridgeService extends Service {
         super.onCreate();
         foreground();
         ble=new BleDisplayClient(this,()->{
-            oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            // Keep the last displayed title across a BLE reconnection.
+            sentMedia=sentRadio=sentStation=0;
             phoneLastSent=0L;
             diag("connect",""+System.currentTimeMillis());
         });
@@ -122,7 +123,8 @@ public final class MediaBridgeService extends Service {
                   || "LEGACY".equals(media.state) || "NOTIFICATION".equals(media.state));
         boolean preferRadio = radioLive && !recentMedia;
         diag("route", preferRadio ? "OEM FM/RDS" :
-                !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
+                !media.title.isEmpty() ? "MP3 / MEDIA" :
+                !oldMedia.isEmpty() ? "TYTUL W TLE - OSTATNIO ODEBRANY" : "BRAK AKTYWNEGO ZRODLA");
 
         // Detect a live call independently of MediaSession and OEM radio metadata.
         // Keep a short grace period to avoid one-second OEM audio-mode glitches.
@@ -181,9 +183,15 @@ public final class MediaBridgeService extends Service {
                 sentMedia = now;
             }
         } else if (!oldMedia.isEmpty()) {
-            ble.send("SRC:MP3|");
-            oldMedia = "";
-            sentMedia = 0L;
+            // K706: leaving NavRadio+, MP3 or YouTube for navigation or home
+            // can hide the media UI without stopping playback. Never send an
+            // empty title solely because no fresh MediaSession/UI snapshot is
+            // available. ESP 1.9x18 keeps scrolling the last received title.
+            // Re-send it periodically to survive GID refreshes and BLE reconnects.
+            if (now - sentMedia >= 5000) {
+                ble.send(oldMedia);
+                sentMedia = now;
+            }
         }
 
     }
