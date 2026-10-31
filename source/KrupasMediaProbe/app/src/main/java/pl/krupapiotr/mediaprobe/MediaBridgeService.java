@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
@@ -32,6 +33,8 @@ public final class MediaBridgeService extends Service {
     private boolean registered;
     private String oldMedia="",oldFreq="",oldStation="";
     private long sentMedia, sentRadio, sentStation;
+    private boolean phoneCallActive = false;
+    private long phoneLastSeen = 0L, phoneLastSent = 0L;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
         h.postDelayed(this,1500);
@@ -42,6 +45,7 @@ public final class MediaBridgeService extends Service {
         foreground();
         ble=new BleDisplayClient(this,()->{
             oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            phoneLastSent=0L;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
@@ -112,9 +116,41 @@ public final class MediaBridgeService extends Service {
         diag("route", preferRadio ? "OEM FM/RDS" :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
 
+        // Detect a live call independently of MediaSession and OEM radio metadata.
+        // Keep a short grace period to avoid one-second OEM audio-mode glitches.
+        boolean phoneObserved = false;
+        try {
+            AudioManager audio = (AudioManager)getSystemService(AUDIO_SERVICE);
+            int mode = audio == null ? AudioManager.MODE_NORMAL : audio.getMode();
+            phoneObserved = mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION;
+            diag("phone_mode", String.valueOf(mode));
+        } catch (Exception ex) { diag("phone_error", ex.toString()); }
+        if (phoneObserved) phoneLastSeen = SystemClock.elapsedRealtime();
+        long monotonicNow = SystemClock.elapsedRealtime();
+        boolean phoneNow = phoneObserved || (phoneCallActive && monotonicNow - phoneLastSeen <= 2500);
+        diag("phone_status", phoneNow ? "ROZMOWA" : "BRAK ROZMOWY");
+
         // Do not update cached sent values while BLE is disconnected.
         // After reconnection the ready callback resets all caches.
         if (!ble.ready()) return;
+
+        // Calls have priority over radio and media. Refresh while active and
+        // send CALL_END once on hangup; never clear the media caches here.
+        if (phoneNow) {
+            if (!phoneCallActive || monotonicNow - phoneLastSent >= 2000) {
+                ble.send("CALL:ROZMOWA");
+                phoneLastSent = monotonicNow;
+            }
+            phoneCallActive = true;
+            return;
+        }
+        if (phoneCallActive) {
+            ble.send("CALL_END");
+            phoneCallActive = false;
+            phoneLastSent = 0L;
+            oldMedia = oldFreq = oldStation = "";
+            sentMedia = sentRadio = sentStation = 0L;
+        }
 
         if (preferRadio) {
             if (!oldMedia.isEmpty()) {
