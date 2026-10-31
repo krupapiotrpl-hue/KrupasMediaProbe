@@ -1,4 +1,4 @@
-name: KRUPAS Media Pro 1.0 APK
+name: KRUPAS Media Pro 0.6.13 APK
 on:
   push:
     branches: [main, 'fix/**']
@@ -34,13 +34,22 @@ jobs:
       - name: Zweryfikuj i nazwij APK
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.0-K706.apk
-          sha256sum KRUPAS-Media-Pro-1.0-K706.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-0.6.13-x18-background-hold.apk
+          sha256sum KRUPAS-Media-Pro-0.6.13-x18-background-hold.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.0-K706-APK
-          path: KRUPAS-Media-Pro-1.0-K706.apk
+          name: KRUPAS-Media-Pro-0.6.13-x18-background-hold-APK
+          path: KRUPAS-Media-Pro-0.6.13-x18-background-hold.apk
           if-no-files-found: error
+      - name: Publikuj bezposredni instalator testowy 0.6.13
+        if: github.ref == 'refs/heads/fix/background-display-hold-0-6-13'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view 'v0.6.13-x18-background-hold' >/dev/null 2>&1; then
+            gh release create 'v0.6.13-x18-background-hold' --target "$GITHUB_SHA" --prerelease --title 'KRUPAS Media Pro 0.6.13 - GID background hold' --notes 'Test: utrzymanie RDS i tytulow MP3/YouTube na Oplu GID po przejsciu odtwarzacza w tlo. ESP 1.9x18 bez zmian. Plik APK debug, moze wymagac odinstalowania starej wersji z innym podpisem.'
+          fi
+          gh release upload 'v0.6.13-x18-background-hold' KRUPAS-Media-Pro-0.6.13-x18-background-hold.apk --clobber
       - name: Opublikuj instalator w GitHub Releases
         if: github.ref == 'refs/heads/main'
         env:
