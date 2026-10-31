@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 32
-        versionCode 13
-        versionName '0.6.12-x18-test'
+        versionCode 14
+        versionName '0.6.13-x18-background-hold'
     }
 
     buildTypes {
