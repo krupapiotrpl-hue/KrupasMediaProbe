@@ -1,7 +1,7 @@
-name: Zbuduj instalator APK 0.6.8 AUTO
+name: Zbuduj instalator APK 0.6.9 AUTO
 on:
   push:
-    branches: [fix/0.6.8-kp1-icons]
+    branches: [fix/0.6.9-call-gid-20261031]
   workflow_dispatch:
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
               archive.extractall("source")
           PY
 
-      - name: Wstaw KRUPAS MEDIA 0.6.8 AUTO
+      - name: Wstaw KRUPAS MEDIA 0.6.9 AUTO
         run: |
           cp ble-patch/DisplayText.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
           cp ble-patch/RadioRdsCache.java source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/
@@ -80,13 +80,13 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk | tee apk-badging.txt
-          grep -Fq "versionName='0.6.8'" apk-badging.txt
+          grep -Fq "versionName='0.6.9'" apk-badging.txt
           grep -Fq "name='pl.krupapiotr.mediaprobe'" apk-badging.txt
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.8.apk
-          test -s KRUPAS-Media-Probe-0.6.8.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Probe-0.6.9.apk
+          test -s KRUPAS-Media-Probe-0.6.9.apk
           python3 - <<'PY'
           import zipfile
-          apk = "KRUPAS-Media-Probe-0.6.8.apk"
+          apk = "KRUPAS-Media-Probe-0.6.9.apk"
           with zipfile.ZipFile(apk) as z:
               files = set(z.namelist())
               assert "AndroidManifest.xml" in files, "APK missing manifest"
@@ -94,24 +94,24 @@ jobs:
               assert "resources.arsc" in files, "APK missing resources"
           print("APK structure: manifest, DEX, resources present")
           PY
-          ls -lh KRUPAS-Media-Probe-0.6.8.apk
-          sha256sum KRUPAS-Media-Probe-0.6.8.apk
+          ls -lh KRUPAS-Media-Probe-0.6.9.apk
+          sha256sum KRUPAS-Media-Probe-0.6.9.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Probe-0.6.8
-          path: KRUPAS-Media-Probe-0.6.8.apk
+          name: KRUPAS-Media-Probe-0.6.9
+          path: KRUPAS-Media-Probe-0.6.9.apk
           if-no-files-found: error
  
       - name: Publish direct APK download as test release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.6.8-k706-test
-          name: KRUPAS Media Pro 0.6.8 K706 TEST
+          tag_name: v0.6.9-k706-test
+          name: KRUPAS Media Pro 0.6.9 K706 TEST
           prerelease: true
           generate_release_notes: false
           body: |
-            Version 0.6.8: conservative build of the 0.6.7 AUTO base for K706.
-            BLE source icons protocol is intentionally not enabled until verified with ESP hardware.
+            Version 0.6.9: conservative build of the 0.6.7 AUTO base for K706.
+            Legacy CALL: and CALL_END frames for ESP phone display; media source icon protocol remains unchanged. This build is for testing on a stationary vehicle.
             This APK is signed with a CI debug key; Android may reject installing it over a build signed with a different key.
-          files: KRUPAS-Media-Probe-0.6.8.apk
+          files: KRUPAS-Media-Probe-0.6.9.apk
