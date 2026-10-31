@@ -325,7 +325,7 @@ public class MediaBridgeService extends Service {
         }
 
         return b
-                .setContentTitle("Krupas Media Pro 0.6.8 AUTO")
+                .setContentTitle("Krupas Media Pro 0.6.9 AUTO")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setOngoing(true)
