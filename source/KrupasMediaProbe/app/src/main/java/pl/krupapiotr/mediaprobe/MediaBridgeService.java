@@ -95,8 +95,12 @@ public final class MediaBridgeService extends Service {
         final String station = SourceRouter.clean(radio.getString("station", ""));
         final long radioSeen = radio.getLong("seen", 0);
         final boolean radioVisible = radio.getBoolean("visible", false);
-        final boolean radioLive = radioVisible && radioSeen > 0 &&
-                now >= radioSeen && now - radioSeen <= 25000 &&
+        // Accessibility reports screen visibility, not whether NavRadio audio
+        // continues in the background. Preserve a bounded FM lease after its
+        // last live screen observation; never treat cached RDS as indefinite.
+        final long radioAge = radioSeen > 0 && now >= radioSeen
+                ? now - radioSeen : Long.MAX_VALUE;
+        final boolean radioLive = radioAge <= 120000 &&
                 (!freq.isEmpty() || !station.isEmpty());
 
         MediaResult media = findPlayingMedia();
@@ -112,7 +116,11 @@ public final class MediaBridgeService extends Service {
         // An actually PLAYING media session is more reliable than a remembered
         // FM label. Visible live radio wins over legacy/notification fallbacks.
         boolean playingSession = "PLAYING".equals(media.state);
-        boolean preferRadio = radioLive && !playingSession;
+        // A fresh MP3/UI title takes priority over the last observed FM screen.
+        boolean recentMedia = !media.title.isEmpty() &&
+                ("PLAYING".equals(media.state) || "MP3 UI".equals(media.state)
+                  || "LEGACY".equals(media.state) || "NOTIFICATION".equals(media.state));
+        boolean preferRadio = radioLive && !recentMedia;
         diag("route", preferRadio ? "OEM FM/RDS" :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
 
