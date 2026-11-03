@@ -29,6 +29,9 @@ public final class MediaBridgeService extends Service {
     static final String ACTION_TEST_MP3="pl.krupapiotr.mediaprobe.TEST_MP3";
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
+    private PhoneCallMonitor phone;
+    private boolean phoneDisplayed;
+    private long lastPhoneSent;
     private boolean registered;
     private String oldMedia="",oldFreq="",oldStation="";
     private long sentMedia, sentRadio, sentStation;
@@ -42,9 +45,12 @@ public final class MediaBridgeService extends Service {
         foreground();
         ble=new BleDisplayClient(this,()->{
             oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            phoneDisplayed=false;lastPhoneSent=0;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
+        phone=new PhoneCallMonitor(this);
+        phone.start();
         registerMusicReceiver();
         h.post(loop);
     }
@@ -58,6 +64,7 @@ public final class MediaBridgeService extends Service {
     @Override public void onDestroy(){
         h.removeCallbacks(loop);
         if(registered)unregisterReceiver(musicReceiver);
+        if(phone!=null)phone.stop();
         if(ble!=null)ble.stop();
         super.onDestroy();
     }
@@ -111,6 +118,24 @@ public final class MediaBridgeService extends Service {
         boolean preferRadio = radioLive && !playingSession;
         diag("route", preferRadio ? "OEM FM/RDS" :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
+
+        // Phone overrides media only while a call is active. FM/MP3 logic below remains unchanged.
+        if (phone!=null && phone.isActive()) {
+            diag("route", "TELEFON / " + phone.status());
+            if(ble.ready() && (!phoneDisplayed || now-lastPhoneSent>=10000)) {
+                ble.send("PHONE:" + phone.display()); // no T|: fixed prefix belongs to ESP
+                phoneDisplayed=true;
+                lastPhoneSent=now;
+            }
+            return;
+        }
+        if(phoneDisplayed) {
+            if(ble.ready()) ble.send("PHONE:STOP");
+            phoneDisplayed=false;
+            lastPhoneSent=0;
+            oldMedia=oldFreq=oldStation="";
+            sentMedia=sentRadio=sentStation=0;
+        }
 
         // Do not update cached sent values while BLE is disconnected.
         // After reconnection the ready callback resets all caches.
