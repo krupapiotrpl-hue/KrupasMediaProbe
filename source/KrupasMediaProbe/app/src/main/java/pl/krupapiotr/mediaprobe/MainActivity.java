@@ -24,7 +24,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
-        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO 1.0 • K706");
+        TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO " + getAppVersion() + " • K706");
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
         hint.setTextSize(14);root.addView(hint);
@@ -47,6 +47,13 @@ public final class MainActivity extends Activity {
         setContentView(root);
         requestBle();startBridge(null);
         h.post(tick);
+    }
+    private String getAppVersion(){
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(),0).versionName;
+        } catch(Exception e) {
+            return "wersja nieznana";
+        }
     }
     private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setSingleLine(true);b.setOnClickListener(v->f.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(0,0,8,0);layout.addView(b,lp);}
     private void startBridge(String action){
