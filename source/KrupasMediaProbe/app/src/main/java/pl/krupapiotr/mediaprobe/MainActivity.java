@@ -13,6 +13,7 @@ import android.provider.Settings;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.HorizontalScrollView;
 import android.widget.TextView;
 import android.graphics.Typeface;
 
@@ -27,13 +28,19 @@ public final class MainActivity extends Activity {
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
         hint.setTextSize(14);root.addView(hint);
-        addButton(root,"1. UPRAWNIENIA BLUETOOTH",()->requestBle());
-        addButton(root,"2. DOSTĘP DO POWIADOMIEŃ (MP3)",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
-        addButton(root,"3. DOSTĘPNOŚĆ (ORYGINALNE FM/RDS)",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        addButton(root,"4. UPRAWNIENIE STANU TELEFONU",()->requestPhone());
-        addButton(root,"START / WZNÓW AUTOMATYCZNE BLE",()->startBridge(null));
-        addButton(root,"TEST FM 107.0",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
-        addButton(root,"TEST MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
+        HorizontalScrollView buttonsScroll=new HorizontalScrollView(this);
+        buttonsScroll.setHorizontalScrollBarEnabled(true);
+        LinearLayout buttons=new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttonsScroll.addView(buttons);
+        root.addView(buttonsScroll,new LinearLayout.LayoutParams(-1,-2));
+        addButton(buttons,"1. UPRAWNIENIA BLUETOOTH",()->requestBle());
+        addButton(buttons,"2. DOSTĘP DO POWIADOMIEŃ (MP3)",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        addButton(buttons,"3. DOSTĘPNOŚĆ (ORYGINALNE FM/RDS)",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        addButton(buttons,"4. UPRAWNIENIE STANU TELEFONU",()->requestPhone());
+        addButton(buttons,"START / WZNÓW AUTOMATYCZNE BLE",()->startBridge(null));
+        addButton(buttons,"TEST FM 107.0",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
+        addButton(buttons,"TEST MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
         ScrollView sv=new ScrollView(this);
         status=new TextView(this);status.setTextSize(14);status.setTypeface(Typeface.MONOSPACE);status.setTextIsSelectable(true);
         sv.addView(status);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
@@ -41,7 +48,7 @@ public final class MainActivity extends Activity {
         requestBle();startBridge(null);
         h.post(tick);
     }
-    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setOnClickListener(v->f.run());layout.addView(b);}
+    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setSingleLine(true);b.setOnClickListener(v->f.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(0,0,8,0);layout.addView(b,lp);}
     private void startBridge(String action){
         try{Intent i=new Intent(this,MediaBridgeService.class);if(action!=null)i.setAction(action);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
