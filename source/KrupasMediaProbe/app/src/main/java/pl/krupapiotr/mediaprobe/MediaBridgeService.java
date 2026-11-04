@@ -98,7 +98,9 @@ public final class MediaBridgeService extends Service {
         final String station = SourceRouter.clean(radio.getString("station", ""));
         final long radioSeen = radio.getLong("seen", 0);
         final boolean radioVisible = radio.getBoolean("visible", false);
-        final boolean radioLive = radioVisible && radioSeen > 0 &&
+        // The accessibility window may be hidden while the radio keeps playing.
+        // Accept only recent captured metadata; never treat cached text as indefinitely live.
+        final boolean radioLive = radioSeen > 0 &&
                 now >= radioSeen && now - radioSeen <= 25000 &&
                 (!freq.isEmpty() || !station.isEmpty());
 
@@ -156,14 +158,11 @@ public final class MediaBridgeService extends Service {
                 ble.send("CLEAR:RDS");
                 oldStation = "";
             }
-            if (!freq.isEmpty() && (frequencyChanged || now - sentRadio >= 10000)) {
-                ble.send("FM:FM " + freq);
-                oldFreq = freq;
-                sentRadio = now;
-            } else if (freq.isEmpty() && !oldFreq.isEmpty()) {
-                ble.send("CLEAR:FM");
-                oldFreq = "";
-            }
+            // Opel already renders FM frequency in its original center line.
+            // Always clear the app-side FM fallback; never duplicate frequency above it.
+            if (frequencyChanged || sentRadio == 0) ble.send("CLEAR:FM");
+            oldFreq = freq;
+            sentRadio = now;
 
             if (!station.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
                 ble.send("RDS:" + station);
