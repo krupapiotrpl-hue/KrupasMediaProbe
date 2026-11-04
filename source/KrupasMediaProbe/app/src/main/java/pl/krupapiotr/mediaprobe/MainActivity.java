@@ -26,21 +26,27 @@ public final class MainActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
         TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO " + getAppVersion() + " • K706");
         heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
-        TextView hint=new TextView(this);hint.setText("Automatyczne BLE → ESP32-S3, oryginalne FM / RDS i MP3. Do FM włącz dostęp do ekranu radia, do MP3 dostęp do powiadomień.");
+        TextView hint=new TextView(this);hint.setText("NavRadio+ / MP3: dostęp do powiadomień. Odczyt ekranu radia: dostępność.");
         hint.setTextSize(14);root.addView(hint);
         HorizontalScrollView buttonsScroll=new HorizontalScrollView(this);
         buttonsScroll.setHorizontalScrollBarEnabled(true);
+        buttonsScroll.setFillViewport(true);
         LinearLayout buttons=new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
         buttonsScroll.addView(buttons);
         root.addView(buttonsScroll,new LinearLayout.LayoutParams(-1,-2));
-        addButton(buttons,"1. UPRAWNIENIA BLUETOOTH",()->requestBle());
-        addButton(buttons,"2. DOSTĘP DO POWIADOMIEŃ (MP3)",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
-        addButton(buttons,"3. DOSTĘPNOŚĆ (ORYGINALNE FM/RDS)",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        addButton(buttons,"4. UPRAWNIENIE STANU TELEFONU",()->requestPhone());
-        addButton(buttons,"START / WZNÓW AUTOMATYCZNE BLE",()->startBridge(null));
-        addButton(buttons,"TEST FM 107.0",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
-        addButton(buttons,"TEST MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
+        addButton(buttons,"Bluetooth",()->requestBle());
+        addButton(buttons,"Powiadomienia",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        addButton(buttons,"Dostępność",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        addButton(buttons,"Telefon",()->requestPhone());
+        addButton(buttons,"Start BLE",()->startBridge(null));
+        addButton(buttons,"Test FM",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
+        addButton(buttons,"Test MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
+        addButton(buttons,"Kopiuj",()->{
+            android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            if(clipboard!=null && status!=null)clipboard.setPrimaryClip(android.content.ClipData.newPlainText("KRUPAS diagnostyka",status.getText()));
+            android.widget.Toast.makeText(this,"Skopiowano diagnostykę",android.widget.Toast.LENGTH_SHORT).show();
+        });
         ScrollView sv=new ScrollView(this);
         status=new TextView(this);status.setTextSize(14);status.setTypeface(Typeface.MONOSPACE);status.setTextIsSelectable(true);
         sv.addView(status);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
@@ -55,7 +61,7 @@ public final class MainActivity extends Activity {
             return "wersja nieznana";
         }
     }
-    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setSingleLine(true);b.setOnClickListener(v->f.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(0,0,8,0);layout.addView(b,lp);}
+    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(8,4,8,4);b.setAllCaps(false);b.setSingleLine(true);b.setOnClickListener(v->f.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2,1);lp.setMargins(0,0,8,0);layout.addView(b,lp);}
     private void startBridge(String action){
         try{Intent i=new Intent(this,MediaBridgeService.class);if(action!=null)i.setAction(action);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
@@ -81,7 +87,8 @@ public final class MainActivity extends Activity {
         android.content.SharedPreferences r=getSharedPreferences("krupas_radio",0);
         String notificationListeners=Settings.Secure.getString(getContentResolver(),"enabled_notification_listeners");
         String accessibility=Settings.Secure.getString(getContentResolver(),"enabled_accessibility_services");
-        status.setText("BLE: "+d.getString("ble","BRAK")+"\n"+
+        status.setText("WERSJA: "+getAppVersion()+" / pl.krupapiotr.mediaprobe\n"+
+                "BLE: "+d.getString("ble","BRAK")+"\n"+
                 "OSTATNIA TRANSMISJA: "+d.getString("last_tx","BRAK")+"\n"+
                 "ŹRÓDŁO: "+d.getString("route","BRAK")+"\n"+
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
@@ -92,8 +99,11 @@ public final class MainActivity extends Activity {
                 "OSTATNI EKRAN FM: "+r.getString("nodes","brak")+"\n\n"+
                 "OSTATNIE MP3 Z POWIADOMIENIA: "+getSharedPreferences("krupas_mp3_notification",0).getString("title","brak")+"\n"+
                 "MP3 Z WIDOKU: "+getSharedPreferences("krupas_mp3_ui",0).getString("title","brak")+"\n\n"+
+                "SESJE: "+d.getString("sessions","—")+"\n"+
+                "BLOKADA TODO: "+d.getString("blocked_tx","—")+"\n"+
                 "DIAG SESJI: "+d.getString("session_error","—")+"\n"+
                 "BŁĄD: "+d.getString("error","—"));
     }
     @Override protected void onDestroy(){h.removeCallbacks(tick);super.onDestroy();}
 }
+

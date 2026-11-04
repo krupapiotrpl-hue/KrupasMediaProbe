@@ -35,6 +35,7 @@ public final class MediaBridgeService extends Service {
     private boolean registered;
     private String oldMedia="",oldFreq="",oldStation="";
     private long sentMedia, sentRadio, sentStation;
+    private boolean radioSessionStopped;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
         h.postDelayed(this,1500);
@@ -95,19 +96,32 @@ public final class MediaBridgeService extends Service {
         final long now = System.currentTimeMillis();
         final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
         final String freq = SourceRouter.clean(radio.getString("freq", ""));
-        final String station = SourceRouter.clean(radio.getString("station", ""));
+        String station = SourceRouter.clean(radio.getString("station", ""));
         final long radioSeen = radio.getLong("seen", 0);
         final boolean radioVisible = radio.getBoolean("visible", false);
         // The accessibility window may be hidden while the radio keeps playing.
         // Accept only recent captured metadata; never treat cached text as indefinitely live.
-        final boolean radioLive = radioSeen > 0 &&
+        boolean radioLive = radioSeen > 0 &&
                 now >= radioSeen && now - radioSeen <= 25000 &&
                 (!freq.isEmpty() || !station.isEmpty());
 
         MediaResult media = findPlayingMedia();
-        if (media.title.isEmpty()) media = fallbackLegacy(now);
-        if (media.title.isEmpty()) media = fallbackVisibleMp3(now, radioSeen);
-        if (media.title.isEmpty()) media = fallbackNotification(now, radioSeen);
+        if (media.title.isEmpty() && !radioSessionStopped) {
+            MediaResult notification = MediaProbeNotificationService.activeRadio(this);
+            if (notification.radio && (!media.radio || notification.pkg.equals(media.pkg))) media = notification;
+        }
+        if (media.title.isEmpty() && !media.radio) media = fallbackLegacy(now);
+        if (media.title.isEmpty() && !media.radio) media = fallbackVisibleMp3(now, radioSeen);
+        if (media.title.isEmpty() && !media.radio) media = fallbackNotification(now, radioSeen);
+        if (radioSessionStopped && !media.radio) radioLive = false;
+        if (media.radio) {
+            radioLive = true;
+            // Prefer actual radio session/notification data. Do not reuse UI
+            // metadata indefinitely or associate another radio's screen with it.
+            station = !media.title.isEmpty() ? media.title :
+                    (now >= radioSeen && now - radioSeen <= 25000 &&
+                     media.pkg.equals(radio.getString("pkg", "")) ? station : "");
+        }
 
         diag("media_status", media.pkg + " / " + media.title + " / " + media.state);
         diag("radio_status", radio.getString("pkg", "") + " / " + freq +
@@ -116,9 +130,9 @@ public final class MediaBridgeService extends Service {
 
         // An actually PLAYING media session is more reliable than a remembered
         // FM label. Visible live radio wins over legacy/notification fallbacks.
-        boolean playingSession = "PLAYING".equals(media.state);
+        boolean playingSession = "PLAYING".equals(media.state) && !media.radio;
         boolean preferRadio = radioLive && !playingSession;
-        diag("route", preferRadio ? "OEM FM/RDS" :
+        diag("route", preferRadio ? "RADIO / " + media.state + (station.isEmpty() ? " / BRAK TEKSTU RDS" : "") :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
 
         // Phone overrides media only while a call is active. FM/MP3 logic below remains unchanged.
@@ -204,6 +218,8 @@ public final class MediaBridgeService extends Service {
     }
     private MediaResult findPlayingMedia(){
         MediaResult best=new MediaResult();
+        radioSessionStopped = false;
+        StringBuilder sessionLog = new StringBuilder();
         try{
             MediaSessionManager manager=(MediaSessionManager)getSystemService(MEDIA_SESSION_SERVICE);
             ComponentName listener=new ComponentName(this,MediaProbeNotificationService.class);
@@ -211,18 +227,34 @@ public final class MediaBridgeService extends Service {
             if(sessions==null)return best;
             for(MediaController c:sessions){
                 PlaybackState state=c.getPlaybackState();
-                if(state==null||state.getState()!=PlaybackState.STATE_PLAYING)continue;
                 String pkg=c.getPackageName();
-                if(SourceRouter.isRadioPackage(pkg))continue;
+                boolean isRadio = SourceRouter.isRadioPackage(pkg);
+                sessionLog.append(pkg).append(" state=").append(state==null ? -1 : state.getState()).append("; ");
+                if(state==null||state.getState()!=PlaybackState.STATE_PLAYING) {
+                    if (isRadio && state!=null && (state.getState()==PlaybackState.STATE_PAUSED ||
+                            state.getState()==PlaybackState.STATE_STOPPED || state.getState()==PlaybackState.STATE_NONE)) radioSessionStopped=true;
+                    continue;
+                }
                 MediaMetadata m=c.getMetadata();
+                if (isRadio) {
+                    MediaResult candidate=new MediaResult();
+                    candidate.pkg=pkg;candidate.radio=true;candidate.state="RADIO SESSION";
+                    candidate.title=m==null ? "" : SourceRouter.radioDisplay(
+                        str(m.getText(MediaMetadata.METADATA_KEY_TITLE)), str(m.getText(MediaMetadata.METADATA_KEY_ARTIST)),
+                        str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)), str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE)));
+                    if (best.state.equals("NONE") || best.radio) best=candidate;
+                    continue;
+                }
                 String title=m==null?"":SourceRouter.mediaDisplay(str(m.getText(MediaMetadata.METADATA_KEY_TITLE)),str(m.getText(MediaMetadata.METADATA_KEY_ARTIST)));
                 if(title.isEmpty()&&m!=null)title=SourceRouter.clean(str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)));
                 if(title.isEmpty())continue;
                 MediaResult candidate=new MediaResult();candidate.pkg=pkg;candidate.title=title;candidate.state="PLAYING";
-                if(best.title.isEmpty() || (SourceRouter.isAudioPackage(pkg)&&!SourceRouter.isAudioPackage(best.pkg)))best=candidate;
+                if(best.title.isEmpty() || best.radio || (SourceRouter.isAudioPackage(pkg)&&!SourceRouter.isAudioPackage(best.pkg)))best=candidate;
             }
         }catch(SecurityException err){diag("session_error","WŁĄCZ DOSTĘP DO POWIADOMIEŃ: "+err.getMessage());}
         catch(Exception err){diag("session_error",err.toString());}
+        diag("sessions", sessionLog.toString());
+        if(best.radio) radioSessionStopped=false;
         return best;
     }
     private static String str(CharSequence a){return a==null?"":a.toString();}
@@ -253,7 +285,7 @@ public final class MediaBridgeService extends Service {
         m.pkg=p.getString("pkg","notification");m.state="NOTIFICATION";
         return m;
     }
-    private static class MediaResult {String title="",pkg="",state="NONE";}
+    static class MediaResult {String title="",pkg="",state="NONE";boolean radio;}
     private final BroadcastReceiver musicReceiver=new BroadcastReceiver(){
         @Override public void onReceive(Context c,Intent i){
             if(i==null)return;
@@ -281,3 +313,4 @@ public final class MediaBridgeService extends Service {
         }catch(Exception e){diag("receiver_error",e.toString());}
     }
 }
+

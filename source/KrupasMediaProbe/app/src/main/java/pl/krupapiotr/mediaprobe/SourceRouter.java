@@ -11,11 +11,42 @@ final class SourceRouter {
 
     static String clean(String v) {
         if (v == null) return "";
-        String s = v.replace('\n', ' ').replace('\r', ' ').replaceAll("\\s+", " ").trim();
+        String s = v.replaceAll("[\\p{Cf}\\p{Z}\\s]+", " ").trim();
         if (s.equalsIgnoreCase("unknown") || s.equalsIgnoreCase("<unknown>") ||
                 s.equalsIgnoreCase("null") || s.equalsIgnoreCase("none") ||
-                s.equalsIgnoreCase("todo") || s.equalsIgnoreCase("unknown title")) return "";
+                isPlaceholder(s) || s.equalsIgnoreCase("unknown title")) return "";
         return s.length() > 90 ? s.substring(0, 90) : s;
+    }
+
+    static boolean isPlaceholder(String value) {
+        if (value == null) return false;
+        String s = value.replaceAll("[\\p{Cf}\\p{Z}\\s]", "").trim();
+        s = s.replaceFirst("(?i)^(?:R[|]|RDS:|TITLE:)", "");
+        return s.equalsIgnoreCase("TODO");
+    }
+
+    // A frequency alone or a player name is not radio text. Other metadata may
+    // legitimately contain digits, FM, or short station names (e.g. RMF FM).
+    static String radioDisplay(String title, String artist, String display, String subtitle) {
+        java.util.LinkedHashSet<String> parts = new java.util.LinkedHashSet<>();
+        for (String value : new String[]{title, artist, display, subtitle}) {
+            String t = clean(value);
+            if (t.isEmpty() || isPlaceholder(t)) continue;
+            String u = t.toUpperCase(Locale.ROOT);
+            if (u.equals("RADIO") || u.equals("NAVRADIO") || u.equals("NAVRADIO+") ||
+                    u.equals("NAVRADIO PLUS") || u.equals("FM")) continue;
+            if (t.matches("(?i)^(?:FM\\s*)?[0-9]+(?:[.,][0-9]+)?(?:\\s*MHz)?$")) continue;
+            boolean duplicate = false;
+            for (String part : parts) if (part.equalsIgnoreCase(t)) duplicate = true;
+            if (!duplicate) parts.add(t);
+        }
+        return clean(androidFreeJoin(parts));
+    }
+
+    private static String androidFreeJoin(java.util.Set<String> parts) {
+        StringBuilder out = new StringBuilder();
+        for (String s : parts) { if (out.length() > 0) out.append(" - "); out.append(s); }
+        return out.toString();
     }
 
     static String frequency(String source) {
@@ -73,3 +104,4 @@ final class SourceRouter {
         return full.length() > 90 ? full.substring(0, 90) : full;
     }
 }
+

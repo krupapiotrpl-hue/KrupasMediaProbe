@@ -6,6 +6,33 @@ import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 
 public class MediaProbeNotificationService extends NotificationListenerService {
+    private static volatile MediaProbeNotificationService connected;
+    @Override public void onListenerConnected() { connected=this; }
+    @Override public void onListenerDisconnected() { connected=null; }
+    @Override public void onDestroy() { if(connected==this)connected=null;super.onDestroy(); }
+
+    static MediaBridgeService.MediaResult activeRadio(android.content.Context context) {
+        MediaBridgeService.MediaResult out=new MediaBridgeService.MediaResult();
+        MediaProbeNotificationService service=connected;
+        if(service==null)return out;
+        try {
+            StatusBarNotification[] notifications=service.getActiveNotifications();
+            if(notifications==null)return out;
+            for(StatusBarNotification sbn:notifications) {
+                Notification n=sbn.getNotification();
+                if(!SourceRouter.isRadioPackage(sbn.getPackageName()) || n==null || !sbn.isOngoing())continue;
+                out.radio=true;out.pkg=sbn.getPackageName();out.state="RADIO NOTIFICATION";
+                out.title=SourceRouter.radioDisplay(text(n.extras,Notification.EXTRA_TITLE),
+                    text(n.extras,Notification.EXTRA_TEXT),text(n.extras,Notification.EXTRA_BIG_TEXT),
+                    text(n.extras,Notification.EXTRA_SUB_TEXT));
+                if(!out.title.isEmpty())return out;
+            }
+        } catch(Exception e) {
+            context.getSharedPreferences("krupas_diag",0).edit().putString("notification_error",e.toString()).apply();
+        }
+        return out;
+    }
+
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || sbn.getNotification() == null) return;
@@ -54,3 +81,4 @@ public class MediaProbeNotificationService extends NotificationListenerService {
         return s == null ? "" : s.toString();
     }
 }
+

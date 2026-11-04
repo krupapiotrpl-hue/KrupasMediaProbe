@@ -167,6 +167,12 @@ final class BleDisplayClient {
     }
     void send(String s){
         if(s==null || s.isEmpty())return;
+        int separator=s.indexOf(':');
+        if(separator>=0 && (s.startsWith("RDS:") || s.startsWith("TITLE:")) &&
+                SourceRouter.isPlaceholder(s.substring(separator+1))) {
+            context.getSharedPreferences("krupas_diag",0).edit().putString("blocked_tx",s).apply();
+            return;
+        }
         h.post(()->{
             if(!running)start();
             // Fresh state is resent by MediaBridgeService after reconnect.
@@ -237,3 +243,4 @@ final class BleDisplayClient {
     }
     private static void safeClose(BluetoothGatt a){if(a!=null){try{a.disconnect();}catch(Exception ignored){}try{a.close();}catch(Exception ignored){}}}
 }
+
