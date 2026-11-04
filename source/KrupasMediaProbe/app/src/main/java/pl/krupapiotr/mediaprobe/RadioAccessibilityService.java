@@ -119,7 +119,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
         }
         // Accept all plausible station names, not only a fixed list of broadcasters.
         for (String item : strings) {
-            if (SourceRouter.validStation(item)) { station = item; break; }
+            if (SourceRouter.validStation(item) && item.length() > station.length()) station = item;
         }
 
         android.content.SharedPreferences pref = getSharedPreferences("krupas_radio", MODE_PRIVATE);
