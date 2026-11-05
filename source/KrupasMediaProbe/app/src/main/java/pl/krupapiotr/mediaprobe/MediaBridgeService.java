@@ -10,6 +10,12 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.telephony.TelephonyManager;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyCallback;
+import java.util.concurrent.Executor;
 import android.content.SharedPreferences;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
@@ -30,6 +36,13 @@ public final class MediaBridgeService extends Service {
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
     private boolean registered;
+    private boolean phoneActive=false;
+    private boolean phoneSent=false;
+    private boolean phoneListenerRegistered=false;
+    private TelephonyManager telephony;
+    private PhoneStateListener oldPhoneListener;
+    private TelephonyCallback phoneCallback;
+    private final Executor phoneExecutor = command -> h.post(command);
     private String oldMedia="",oldFreq="",oldStation="";
     private long sentMedia, sentRadio, sentStation;
     private final Runnable loop=new Runnable(){@Override public void run(){
@@ -42,10 +55,12 @@ public final class MediaBridgeService extends Service {
         foreground();
         ble=new BleDisplayClient(this,()->{
             oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            phoneSent=false;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
         registerMusicReceiver();
+        registerPhoneListener();
         h.post(loop);
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
@@ -58,6 +73,7 @@ public final class MediaBridgeService extends Service {
     @Override public void onDestroy(){
         h.removeCallbacks(loop);
         if(registered)unregisterReceiver(musicReceiver);
+        unregisterPhoneListener();
         if(ble!=null)ble.stop();
         super.onDestroy();
     }
@@ -82,10 +98,72 @@ public final class MediaBridgeService extends Service {
         startForeground(19,n);
     }
     private void diag(String k,String v){getSharedPreferences("krupas_diag",0).edit().putString(k,v).apply();}
+    private void onPhoneStateChanged(int state) {
+        final boolean active = state == TelephonyManager.CALL_STATE_RINGING ||
+                               state == TelephonyManager.CALL_STATE_OFFHOOK;
+        if (phoneActive == active) return;
+        phoneActive = active;
+        diag("phone_status", active ? "AKTYWNE / DZWONI" : "IDLE");
+        if (!active && !phoneSent) {
+            oldMedia=""; oldFreq=""; oldStation="";
+            sentMedia=sentRadio=sentStation=0;
+        }
+        h.post(() -> { try { refresh(); } catch(Exception e){ diag("phone_error",e.toString()); } });
+    }
+    private void registerPhoneListener() {
+        if (Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.READ_PHONE_STATE)!=PackageManager.PERMISSION_GRANTED) {
+            diag("phone_status", "BRAK READ_PHONE_STATE - przyznaj w aplikacji");
+            return;
+        }
+        try {
+            telephony = (TelephonyManager)getSystemService(TELEPHONY_SERVICE);
+            if (telephony == null) {diag("phone_status","BRAK TELEPHONY_SERVICE");return;}
+            if (Build.VERSION.SDK_INT>=31) {
+                class CallCallback extends TelephonyCallback implements TelephonyCallback.CallStateListener {
+                    @Override public void onCallStateChanged(int state) {onPhoneStateChanged(state);}
+                }
+                phoneCallback=new CallCallback();
+                telephony.registerTelephonyCallback(phoneExecutor,phoneCallback);
+            } else {
+                oldPhoneListener = new PhoneStateListener() {
+                    @Override public void onCallStateChanged(int state, String ignoredIncomingNumber) {
+                        onPhoneStateChanged(state);
+                    }
+                };
+                telephony.listen(oldPhoneListener,PhoneStateListener.LISTEN_CALL_STATE);
+            }
+            phoneListenerRegistered=true;
+            onPhoneStateChanged(telephony.getCallState());
+            diag("phone_status",phoneActive?"AKTYWNE":"NASLUCH OK");
+        } catch(Exception e) {diag("phone_status","BLAD: "+e.toString());}
+    }
+    private void unregisterPhoneListener() {
+        if(!phoneListenerRegistered || telephony==null)return;
+        try {
+            if(Build.VERSION.SDK_INT>=31 && phoneCallback!=null)telephony.unregisterTelephonyCallback(phoneCallback);
+            else if(oldPhoneListener!=null)telephony.listen(oldPhoneListener,PhoneStateListener.LISTEN_NONE);
+        } catch(Exception ignored){}
+        phoneListenerRegistered=false;
+    }
     private void refresh(){
         if (ble == null) return;
+        if(!phoneListenerRegistered && Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.READ_PHONE_STATE)==PackageManager.PERMISSION_GRANTED) registerPhoneListener();
         ble.watchdog();
         final long now = System.currentTimeMillis();
+        if (phoneActive) {
+            if (ble.ready() && !phoneSent) {
+                ble.send("CALL:Rozmowa");
+                phoneSent = true;
+                diag("phone_status", "CALL wyslano");
+            }
+            return; // During calls media polling must not overwrite T|.
+        }
+        if (phoneSent && ble.ready()) {
+            ble.send("CALL:OFF");
+            phoneSent=false;
+            oldMedia=""; oldFreq=""; oldStation="";
+            sentMedia=sentRadio=sentStation=0;
+        }
         final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
         final String freq = SourceRouter.clean(radio.getString("freq", ""));
         final String station = SourceRouter.clean(radio.getString("station", ""));
