@@ -30,6 +30,7 @@ public final class MainActivity extends Activity {
         addButton(root,"1. UPRAWNIENIA BLUETOOTH",()->requestBle());
         addButton(root,"2. DOSTĘP DO POWIADOMIEŃ (MP3)",()->startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
         addButton(root,"3. DOSTĘPNOŚĆ (ORYGINALNE FM/RDS)",()->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+        addButton(root,"4. UPRAWNIENIE TELEFONU (T|)",()->requestPhonePermission());
         addButton(root,"START / WZNÓW AUTOMATYCZNE BLE",()->startBridge(null));
         addButton(root,"TEST FM 107.0",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
         addButton(root,"TEST MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
@@ -45,6 +46,11 @@ public final class MainActivity extends Activity {
         try{Intent i=new Intent(this,MediaBridgeService.class);if(action!=null)i.setAction(action);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
         }catch(Exception ex){getSharedPreferences("krupas_diag",0).edit().putString("error","start: "+ex).apply();}
+    }
+    private void requestPhonePermission(){
+        if(Build.VERSION.SDK_INT>=23 && checkSelfPermission(Manifest.permission.READ_PHONE_STATE)!=PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.READ_PHONE_STATE},12);
+        else startBridge(null);
     }
     private void requestBle(){
         if(Build.VERSION.SDK_INT>=31){
@@ -65,6 +71,7 @@ public final class MainActivity extends Activity {
                 "OSTATNIA TRANSMISJA: "+d.getString("last_tx","BRAK")+"\n"+
                 "ŹRÓDŁO: "+d.getString("route","BRAK")+"\n"+
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
+                "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "NOTYFIKACJE: "+(notificationListeners!=null&&notificationListeners.contains(getPackageName())?"OK":"BRAK UPRAWNIEŃ")+"\n"+
                 "DOSTĘPNOŚĆ RADIO: "+(accessibility!=null&&accessibility.contains(getPackageName()+"/"+RadioAccessibilityService.class.getName())?"OK":"SPRAWDŹ")+"\n\n"+
