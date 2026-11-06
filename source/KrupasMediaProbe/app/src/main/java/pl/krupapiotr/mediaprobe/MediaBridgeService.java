@@ -124,8 +124,14 @@ public final class MediaBridgeService extends Service {
             if (notification.radio && (!media.radio || notification.pkg.equals(media.pkg))) media = notification;
         }
         if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackDabUi(now);
+        // A fresh, visible LOCAL MP3 title wins over delayed legacy broadcasts.
+        // YouTube, MP4, DAB+ and FM retain the exact previous routing.
+        MediaResult localMp3 = fallbackVisibleMp3(now, radioSeen);
+        if (media.title.isEmpty() && !media.radio && !media.dab &&
+                SourceRouter.isLocalMp3Package(localMp3.pkg) && !localMp3.title.isEmpty())
+            media = localMp3;
         if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackLegacy(now);
-        if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackVisibleMp3(now, radioSeen);
+        if (media.title.isEmpty() && !media.radio && !media.dab) media = localMp3;
         if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackNotification(now, radioSeen);
         if (radioSessionStopped && !media.radio) radioLive = false;
         if (media.radio) {
