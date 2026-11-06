@@ -33,8 +33,8 @@ public final class MediaBridgeService extends Service {
     private boolean phoneDisplayed;
     private long lastPhoneSent;
     private boolean registered;
-    private String oldMedia="",oldFreq="",oldStation="";
-    private long sentMedia, sentRadio, sentStation;
+    private String oldMedia="",oldFreq="",oldStation="",oldDab="";
+    private long sentMedia, sentRadio, sentStation, sentDab;
     private boolean radioSessionStopped;
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
@@ -45,7 +45,7 @@ public final class MediaBridgeService extends Service {
         super.onCreate();
         foreground();
         ble=new BleDisplayClient(this,()->{
-            oldMedia="";oldFreq="";oldStation="";sentMedia=sentRadio=sentStation=0;
+            oldMedia="";oldFreq="";oldStation="";oldDab="";sentMedia=sentRadio=sentStation=sentDab=0;
             phoneDisplayed=false;lastPhoneSent=0;
             diag("connect",""+System.currentTimeMillis());
         });
@@ -84,7 +84,7 @@ public final class MediaBridgeService extends Service {
         PendingIntent tap=PendingIntent.getActivity(this,0,open,flags);
         Notification.Builder builder=Build.VERSION.SDK_INT>=26 ? new Notification.Builder(this,id):new Notification.Builder(this);
         Notification n=builder.setContentTitle("KRUPAS Media — BLE")
-                .setContentText("Nasłuch MP3 i radia FM")
+                .setContentText("Nasłuch FM, MP3 i DAB-Z")
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setOngoing(true).setContentIntent(tap).build();
         startForeground(19,n);
@@ -108,13 +108,19 @@ public final class MediaBridgeService extends Service {
                 (!freq.isEmpty() || !station.isEmpty() || !screenRds.isEmpty());
 
         MediaResult media = findPlayingMedia();
-        if (media.title.isEmpty() && !radioSessionStopped) {
+        // DAB-Z notifications do not always expose a MediaSession.
+        if (media.title.isEmpty() && !media.dab) {
+            MediaResult dabNotification = MediaProbeNotificationService.activeDab(this);
+            if (dabNotification.dab) media = dabNotification;
+        }
+        if (media.title.isEmpty() && !radioSessionStopped && !media.dab) {
             MediaResult notification = MediaProbeNotificationService.activeRadio(this);
             if (notification.radio && (!media.radio || notification.pkg.equals(media.pkg))) media = notification;
         }
-        if (media.title.isEmpty() && !media.radio) media = fallbackLegacy(now);
-        if (media.title.isEmpty() && !media.radio) media = fallbackVisibleMp3(now, radioSeen);
-        if (media.title.isEmpty() && !media.radio) media = fallbackNotification(now, radioSeen);
+        if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackDabUi(now);
+        if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackLegacy(now);
+        if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackVisibleMp3(now, radioSeen);
+        if (media.title.isEmpty() && !media.radio && !media.dab) media = fallbackNotification(now, radioSeen);
         if (radioSessionStopped && !media.radio) radioLive = false;
         if (media.radio) {
             radioLive = true;
@@ -141,8 +147,12 @@ public final class MediaBridgeService extends Service {
         // An actually PLAYING media session is more reliable than a remembered
         // FM label. Visible live radio wins over legacy/notification fallbacks.
         boolean playingSession = "PLAYING".equals(media.state) && !media.radio;
-        boolean preferRadio = radioLive && !playingSession;
-        diag("route", preferRadio ? "RADIO / " + media.state + (station.isEmpty() ? " / BRAK TEKSTU RDS" : "") :
+        boolean preferDab = media.dab && !media.title.isEmpty();
+        boolean preferRadio = !preferDab && radioLive && !playingSession;
+        diag("dab_status", (preferDab ? "AKTYWNE" : "NIEAKTYWNE") + " / " +
+                media.pkg + " / " + (media.dab ? media.title : "") + " / " + media.state);
+        diag("route", preferDab ? "DAB+ / " + media.state :
+                preferRadio ? "RADIO / " + media.state :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
 
         // Phone overrides media only while a call is active. FM/MP3 logic below remains unchanged.
@@ -159,15 +169,36 @@ public final class MediaBridgeService extends Service {
             if(ble.ready()) ble.send("PHONE:STOP");
             phoneDisplayed=false;
             lastPhoneSent=0;
-            oldMedia=oldFreq=oldStation="";
-            sentMedia=sentRadio=sentStation=0;
+            oldMedia=oldFreq=oldStation=oldDab="";
+            sentMedia=sentRadio=sentStation=sentDab=0;
         }
 
         // Do not update cached sent values while BLE is disconnected.
         // After reconnection the ready callback resets all caches.
         if (!ble.ready()) return;
 
-        if (preferRadio) {
+        final boolean nativeDab = getSharedPreferences("krupas_settings",0)
+                .getBoolean("dab_native_protocol",false);
+        // Prepare the native D| protocol now; default to TITLE: for current ESP 1.9x17.
+        // Switching the UI toggle later enables DAB:TEXT without another Android update.
+        if (!preferDab && !oldDab.isEmpty()) {
+            ble.send(nativeDab ? "DAB:STOP" : "MEDIA:STOP");
+            oldDab=""; sentDab=0;
+            oldMedia=""; sentMedia=0;
+        }
+        if (preferDab) {
+            if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
+                ble.send("CLEAR:FM");
+                ble.send("CLEAR:RDS");
+                oldFreq=oldStation=""; sentRadio=sentStation=0;
+            }
+            if (!media.title.equals(oldDab) || now-sentDab >= 10000) {
+                // For 1.9x17 TITLE becomes M|. Future ESP DAB:TEXT becomes D|.
+                ble.send(nativeDab ? "DAB:TEXT:" + media.title : "TITLE:" + media.title);
+                oldDab=media.title; oldMedia=media.title; sentDab=sentMedia=now;
+            }
+        }
+        else if (preferRadio) {
             if (!oldMedia.isEmpty()) {
                 ble.send("MEDIA:STOP");
                 oldMedia = "";
@@ -239,6 +270,7 @@ public final class MediaBridgeService extends Service {
                 PlaybackState state=c.getPlaybackState();
                 String pkg=c.getPackageName();
                 boolean isRadio = SourceRouter.isRadioPackage(pkg);
+                boolean isDab = SourceRouter.isDabPackage(pkg);
                 sessionLog.append(pkg).append(" state=").append(state==null ? -1 : state.getState()).append("; ");
                 if(state==null||state.getState()!=PlaybackState.STATE_PLAYING) {
                     if (isRadio && state!=null && (state.getState()==PlaybackState.STATE_PAUSED ||
@@ -246,6 +278,17 @@ public final class MediaBridgeService extends Service {
                     continue;
                 }
                 MediaMetadata m=c.getMetadata();
+                if (isDab) {
+                    MediaResult candidate=new MediaResult();
+                    candidate.pkg=pkg;candidate.dab=true;candidate.state="PLAYING";
+                    candidate.title=m==null ? "" : SourceRouter.dabDisplay(
+                        str(m.getText(MediaMetadata.METADATA_KEY_TITLE)),
+                        str(m.getText(MediaMetadata.METADATA_KEY_ARTIST)),
+                        str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)),
+                        str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE)));
+                    if (!candidate.title.isEmpty()) best=candidate;
+                    continue;
+                }
                 if (isRadio) {
                     MediaResult candidate=new MediaResult();
                     candidate.pkg=pkg;candidate.radio=true;candidate.state="RADIO SESSION";
@@ -268,6 +311,16 @@ public final class MediaBridgeService extends Service {
         return best;
     }
     private static String str(CharSequence a){return a==null?"":a.toString();}
+    private MediaResult fallbackDabUi(long now) {
+        MediaResult m = new MediaResult();
+        SharedPreferences p=getSharedPreferences("krupas_dab_ui",0);
+        long stamp=p.getLong("seen",0);
+        if(stamp<=0 || now<stamp || now-stamp>7000 || !p.getBoolean("visible",false))return m;
+        m.title=SourceRouter.clean(p.getString("title",""));
+        if(m.title.isEmpty())return m;
+        m.pkg=p.getString("pkg","com.zoulou.dab");m.state="DAB UI";m.dab=true;
+        return m;
+    }
     private MediaResult fallbackLegacy(long now){
         SharedPreferences p=getSharedPreferences("krupas_legacy",0);
         MediaResult x=new MediaResult();
@@ -295,7 +348,7 @@ public final class MediaBridgeService extends Service {
         m.pkg=p.getString("pkg","notification");m.state="NOTIFICATION";
         return m;
     }
-    static class MediaResult {String title="",pkg="",state="NONE";boolean radio;}
+    static class MediaResult {String title="",pkg="",state="NONE";boolean radio,dab;}
     private final BroadcastReceiver musicReceiver=new BroadcastReceiver(){
         @Override public void onReceive(Context c,Intent i){
             if(i==null)return;
