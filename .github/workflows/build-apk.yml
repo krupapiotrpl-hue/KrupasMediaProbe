@@ -1,7 +1,7 @@
 name: KRUPAS Media Pro K706 APK
 on:
   push:
-    branches: [main, 'fix/**', 'feature/**']
+    branches: [main, 'fix/**', 'feature/**', 'test/**']
   workflow_dispatch:
 permissions:
   contents: write
@@ -44,7 +44,7 @@ jobs:
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
           sha256sum KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
       - uses: actions/upload-artifact@v4
-        if: github.ref != 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
+        if: github.ref != 'refs/heads/fix/k706-131-phone-mp3-safe-20261106' && github.ref != 'refs/heads/test/k706-131-side-by-side-20261106'
         with:
           name: KRUPAS-Media-Pro-K706-APK
           path: KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
@@ -61,6 +61,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create 'v1.3.1-k706-phone-mp3-test' KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.1 K706 - telefon MP3 test' --notes 'TEST: HFP nasluch opcjonalny, test PHONE: i poprawne PHONE:OFF. Lokalny MP3 tylko poza DAB/FM/YouTube/MP4. Test wymagany na K706, dostep do HFP moze byc ograniczony przez system. APK podpisany debugowo, przed instalacja zachowaj 1.3.0.' --prerelease
+      - name: Przygotuj osobny instalator TEST instalowany obok 1.3.0
+        if: github.ref == 'refs/heads/test/k706-131-side-by-side-20261106'
+        run: |
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.1-OBOK-1.3.0-K706-TEST.apk
+          sha256sum KRUPAS-Media-Pro-1.3.1-OBOK-1.3.0-K706-TEST.apk
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/test/k706-131-side-by-side-20261106'
+        with:
+          name: KRUPAS-Media-Pro-1.3.1-SIDE-BY-SIDE-K706-TEST-APK
+          path: KRUPAS-Media-Pro-1.3.1-OBOK-1.3.0-K706-TEST.apk
+          if-no-files-found: error
+      - name: Opublikuj osobne wydanie testowe obok 1.3.0
+        if: github.ref == 'refs/heads/test/k706-131-side-by-side-20261106'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create 'v1.3.1-k706-side-by-side-test' KRUPAS-Media-Pro-1.3.1-OBOK-1.3.0-K706-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.1 K706 TEST obok 1.3.0' --notes 'Osobne applicationId: pl.krupapiotr.mediaprobe.sidebyside. Instalacja obok, NIE aktualizacja 1.3.0. Brak autostartu testu po rozruchu. Wazne: aby uniknac 2 polaczen BLE, wymus zatrzymanie starej aplikacji podczas testu. HFP zalezny od firmware K706. Podpis testowy debug; kolejne buildy wymagaja trwalego bezpiecznie przechowywanego klucza.' --prerelease
       - name: Opublikuj test BLE i DAB-Z bez nadpisania stabilnej wersji
         if: github.ref == 'refs/heads/feature/k706-ble-dab-20261106'
         env:
