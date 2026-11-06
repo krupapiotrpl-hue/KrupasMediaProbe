@@ -1,7 +1,7 @@
-name: KRUPAS Media Pro 1.2-navradio APK
+name: KRUPAS Media Pro K706 APK
 on:
   push:
-    branches: [main, 'fix/**']
+    branches: [main, 'fix/**', 'feature/**']
   workflow_dispatch:
 permissions:
   contents: write
@@ -36,12 +36,19 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2-navradio-K706.apk
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.2-navradio-K706.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
+          sha256sum KRUPAS-Media-Pro-1.2-navradio-K706.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST-APK
-          path: KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
+          name: KRUPAS-Media-Pro-K706-APK
+          path: KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
           if-no-files-found: error
+      - name: Opublikuj test BLE i DAB-Z bez nadpisania stabilnej wersji
+        if: github.ref == 'refs/heads/feature/k706-ble-dab-20261106'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create 'v1.3.0-k706-ble-dab-test' KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.0 K706 - BLE + DAB-Z TEST' --notes 'Zapis BLE z potwierdzeniem; DAB-Z MediaSession, powiadomienia i widok; DAB| natywnie po aktualizacji ESP; domyślnie zgodność 1.9x17 przez TITLE (M|). Wymaga weryfikacji na radiu. Podpis debug moze wymagac deinstalacji poprzedniego wydania.' --prerelease
       - name: Opublikuj osobny testowy APK dla K706
         if: github.ref == 'refs/heads/fix/k706-rds-larger-fonts-20261106'
         env:
