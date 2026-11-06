@@ -1,0 +1,30 @@
+name: CANBUS Auto Gesture 0.2 APK
+on:
+  push:
+    branches:
+      - experiment/canbus-auto-gestures-20261106
+    paths:
+      - 'CanbusAutoApplyV2/**'
+      - '.github/workflows/canbus-auto-gesture.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: CanbusAutoApplyV2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Assemble 0.2 test APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CANBUS-Auto-Gesture-0.2-test
+          path: CanbusAutoApplyV2/app/build/outputs/apk/debug/app-debug.apk
