@@ -88,6 +88,19 @@ final class SourceRouter {
         return p.contains("radio") || p.contains("navimod") || p.contains("fmplayer") || p.contains("fmradio");
     }
 
+    // Only for the local MP3 UI metadata fallback. Keep YouTube, MP4 and DAB
+    // classification unchanged; never promote their UI labels to an MP3 title.
+    static boolean isLocalMp3Package(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return false;
+        String p = pkg.toLowerCase(Locale.ROOT);
+        if (isDabPackage(pkg) || isRadioPackage(pkg) ||
+                p.contains("youtube") || p.contains("video") ||
+                p.contains("mp4") || p.contains("movie")) return false;
+        return p.equals("mp3-ui") || p.contains("mp3") || p.contains("music") ||
+                p.contains("audio") || p.contains("usbplayer") ||
+                p.contains("localplayer");
+    }
+
     static boolean isAudioPackage(String pkg) {
         if (pkg == null) return false;
         String p = pkg.toLowerCase(Locale.ROOT);
