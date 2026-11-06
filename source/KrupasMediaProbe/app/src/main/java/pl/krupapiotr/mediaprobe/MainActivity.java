@@ -25,9 +25,9 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
         TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO " + getAppVersion() + " • K706");
-        heading.setTextSize(22);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
+        heading.setTextSize(24);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("NavRadio+ / MP3: dostęp do powiadomień. Odczyt ekranu radia: dostępność.");
-        hint.setTextSize(14);root.addView(hint);
+        hint.setTextSize(18);root.addView(hint);
         HorizontalScrollView buttonsScroll=new HorizontalScrollView(this);
         buttonsScroll.setHorizontalScrollBarEnabled(true);
         buttonsScroll.setFillViewport(true);
@@ -48,7 +48,7 @@ public final class MainActivity extends Activity {
             android.widget.Toast.makeText(this,"Skopiowano diagnostykę",android.widget.Toast.LENGTH_SHORT).show();
         });
         ScrollView sv=new ScrollView(this);
-        status=new TextView(this);status.setTextSize(14);status.setTypeface(Typeface.MONOSPACE);status.setTextIsSelectable(true);
+        status=new TextView(this);status.setTextSize(18);status.setTypeface(Typeface.MONOSPACE);status.setTextIsSelectable(true);
         sv.addView(status);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         requestBle();startBridge(null);
@@ -61,7 +61,7 @@ public final class MainActivity extends Activity {
             return "wersja nieznana";
         }
     }
-    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(11);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(8,4,8,4);b.setAllCaps(false);b.setSingleLine(true);b.setOnClickListener(v->f.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2,1);lp.setMargins(0,0,8,0);layout.addView(b,lp);}
+    private void addButton(LinearLayout layout,String title,Runnable f){Button b=new Button(this);b.setText(title);b.setTextSize(16);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(18,9,18,9);b.setAllCaps(false);b.setSingleLine(true);b.setOnClickListener(v->f.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(0,0,8,0);layout.addView(b,lp);}
     private void startBridge(String action){
         try{Intent i=new Intent(this,MediaBridgeService.class);if(action!=null)i.setAction(action);
             if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
