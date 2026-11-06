@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 32
-        versionCode 120
-        versionName '1.2-navradio'
+        versionCode 121
+        versionName '1.2.1-navradio-k706'
     }
 
     buildTypes {
