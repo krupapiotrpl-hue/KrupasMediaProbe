@@ -26,7 +26,7 @@ public final class MainActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
         TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO " + getAppVersion() + " • K706");
         heading.setTextSize(24);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
-        TextView hint=new TextView(this);hint.setText("NavRadio+ / MP3: dostęp do powiadomień. Odczyt ekranu radia: dostępność.");
+        TextView hint=new TextView(this);hint.setText("FM / MP3 / DAB-Z: powiadomienia. DAB+: przygotowany protokół DAB dla przyszłego firmware ESP.");
         hint.setTextSize(18);root.addView(hint);
         HorizontalScrollView buttonsScroll=new HorizontalScrollView(this);
         buttonsScroll.setHorizontalScrollBarEnabled(true);
@@ -94,6 +94,7 @@ public final class MainActivity extends Activity {
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
+                "DAB+: "+d.getString("dab_status","BRAK")+"\n"+
                 "RDS DYNAMICZNY: "+d.getString("rds_status","BRAK")+"\n"+
                 "NOTYFIKACJE: "+(notificationListeners!=null&&notificationListeners.contains(getPackageName())?"OK":"BRAK UPRAWNIEŃ")+"\n"+
                 "DOSTĘPNOŚĆ RADIO: "+(accessibility!=null&&accessibility.contains(getPackageName()+"/"+RadioAccessibilityService.class.getName())?"OK":"SPRAWDŹ")+"\n\n"+
