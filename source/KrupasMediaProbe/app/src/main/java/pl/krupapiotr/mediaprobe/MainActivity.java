@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.HorizontalScrollView;
@@ -28,6 +29,14 @@ public final class MainActivity extends Activity {
         heading.setTextSize(24);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
         TextView hint=new TextView(this);hint.setText("FM / MP3 / DAB-Z: powiadomienia. DAB+: przygotowany protokół DAB dla przyszłego firmware ESP.");
         hint.setTextSize(18);root.addView(hint);
+        CheckBox dabNative=new CheckBox(this);
+        dabNative.setText("DAB+ D| (włącz dopiero po aktualizacji ESP; teraz M|)");
+        dabNative.setTextSize(16);
+        dabNative.setChecked(getSharedPreferences("krupas_settings",0)
+                .getBoolean("dab_native_protocol",false));
+        dabNative.setOnCheckedChangeListener((button,checked)->getSharedPreferences("krupas_settings",0)
+                .edit().putBoolean("dab_native_protocol",checked).apply());
+        root.addView(dabNative);
         HorizontalScrollView buttonsScroll=new HorizontalScrollView(this);
         buttonsScroll.setHorizontalScrollBarEnabled(true);
         buttonsScroll.setFillViewport(true);
