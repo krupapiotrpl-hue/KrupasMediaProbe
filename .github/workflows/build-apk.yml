@@ -38,11 +38,29 @@ jobs:
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
           sha256sum KRUPAS-Media-Pro-1.2-navradio-K706.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
+      - name: Osobny plik 1.3.1 tylko dla galezi poprawkowej
+        if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
+        run: |
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
+          sha256sum KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
       - uses: actions/upload-artifact@v4
+        if: github.ref != 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
         with:
           name: KRUPAS-Media-Pro-K706-APK
           path: KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
+        with:
+          name: KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST-APK
+          path: KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
+          if-no-files-found: error
+      - name: Publikuj osobna testowa wersje 1.3.1 bez nadpisania 1.3.0
+        if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create 'v1.3.1-k706-phone-mp3-test' KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.1 K706 - telefon MP3 test' --notes 'TEST: HFP nasluch opcjonalny, test PHONE: i poprawne PHONE:OFF. Lokalny MP3 tylko poza DAB/FM/YouTube/MP4. Test wymagany na K706, dostep do HFP moze byc ograniczony przez system. APK podpisany debugowo, przed instalacja zachowaj 1.3.0.' --prerelease
       - name: Opublikuj test BLE i DAB-Z bez nadpisania stabilnej wersji
         if: github.ref == 'refs/heads/feature/k706-ble-dab-20261106'
         env:
