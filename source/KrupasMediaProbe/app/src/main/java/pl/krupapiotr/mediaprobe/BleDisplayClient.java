@@ -138,10 +138,11 @@ final class BleDisplayClient {
             write=s==null?null:s.getCharacteristic(CHAR);
             if(write==null){fail("BRAK CHAR WRITE - SPRAWDŹ UUID ESP");return;}
             int properties=write.getProperties();
-            if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)!=0)
-                writeType=BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
-            else if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE)!=0)
+            // Prefer confirmed GATT writes if the ESP exposes both capabilities.
+            if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE)!=0)
                 writeType=BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
+            else if((properties & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)!=0)
+                writeType=BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
             else {fail("CHAR ESP NIE OBSŁUGUJE WRITE (PROP="+properties+")");return;}
             if(timeoutTask!=null)h.removeCallbacks(timeoutTask);
             failures=0;ready=true;busy=false;
@@ -229,7 +230,7 @@ final class BleDisplayClient {
     void watchdog(){
         if(ready&&busy && SystemClock.elapsedRealtime()-startedConnect>15000) {
             // Guard only an actual stuck write: timestamps updated on enqueue below.
-            if(lastWrite>0 && SystemClock.elapsedRealtime()-lastWrite>10000)fail("TIMEOUT BLE WRITE");
+            if(lastWrite>0 && SystemClock.elapsedRealtime()-lastWrite>7000)fail("TIMEOUT BLE WRITE");
         }
     }
     private long lastWrite;
