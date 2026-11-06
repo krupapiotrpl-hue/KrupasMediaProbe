@@ -102,6 +102,7 @@ public final class MainActivity extends Activity {
                 "ŹRÓDŁO: "+d.getString("route","BRAK")+"\n"+
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
+                "HFP BLUETOOTH: "+d.getString("hfp_status","BRAK") +"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "DAB+: "+d.getString("dab_status","BRAK")+"\n"+
                 "RDS DYNAMICZNY: "+d.getString("rds_status","BRAK")+"\n"+
