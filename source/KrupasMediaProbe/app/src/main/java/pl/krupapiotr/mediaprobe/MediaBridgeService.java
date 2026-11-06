@@ -109,9 +109,12 @@ public final class MediaBridgeService extends Service {
 
         MediaResult media = findPlayingMedia();
         // DAB-Z notifications do not always expose a MediaSession.
-        if (media.title.isEmpty() && !media.dab) {
+        // Prefer the active DAB-Z notification over an unrelated or stale
+        // media session. DAB-Z can publish metadata without MediaSession.
+        // Do not replace a confirmed DAB MediaSession with notification data.
+        if (!media.dab) {
             MediaResult dabNotification = MediaProbeNotificationService.activeDab(this);
-            if (dabNotification.dab) media = dabNotification;
+            if (dabNotification.dab && !dabNotification.title.isEmpty()) media = dabNotification;
         }
         if (media.title.isEmpty() && !radioSessionStopped && !media.dab) {
             MediaResult notification = MediaProbeNotificationService.activeRadio(this);
@@ -302,7 +305,7 @@ public final class MediaBridgeService extends Service {
                 if(title.isEmpty()&&m!=null)title=SourceRouter.clean(str(m.getText(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)));
                 if(title.isEmpty())continue;
                 MediaResult candidate=new MediaResult();candidate.pkg=pkg;candidate.title=title;candidate.state="PLAYING";
-                if(best.title.isEmpty() || best.radio || (SourceRouter.isAudioPackage(pkg)&&!SourceRouter.isAudioPackage(best.pkg)))best=candidate;
+                if(!best.dab && (best.title.isEmpty() || best.radio || (SourceRouter.isAudioPackage(pkg)&&!SourceRouter.isAudioPackage(best.pkg))))best=candidate;
             }
         }catch(SecurityException err){diag("session_error","WŁĄCZ DOSTĘP DO POWIADOMIEŃ: "+err.getMessage());}
         catch(Exception err){diag("session_error",err.toString());}
