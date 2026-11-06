@@ -30,7 +30,9 @@ public final class MediaBridgeService extends Service {
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
     private PhoneCallMonitor phone;
+    private HfpCallMonitor hfp;
     private boolean phoneDisplayed;
+    private String lastPhoneText="";
     private long lastPhoneSent;
     private boolean registered;
     private String oldMedia="",oldFreq="",oldStation="",oldDab="";
@@ -46,12 +48,14 @@ public final class MediaBridgeService extends Service {
         foreground();
         ble=new BleDisplayClient(this,()->{
             oldMedia="";oldFreq="";oldStation="";oldDab="";sentMedia=sentRadio=sentStation=sentDab=0;
-            phoneDisplayed=false;lastPhoneSent=0;
+            phoneDisplayed=false;lastPhoneSent=0;lastPhoneText="";
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
         phone=new PhoneCallMonitor(this);
         phone.start();
+        hfp=new HfpCallMonitor(this);
+        hfp.start();
         registerMusicReceiver();
         h.post(loop);
     }
@@ -60,12 +64,14 @@ public final class MediaBridgeService extends Service {
             ble.send("FM:107.0"); ble.send("RDS:TEST FM");
         }
         if(intent!=null && ACTION_TEST_MP3.equals(intent.getAction())) ble.send("TITLE:KRUPAS TEST MP3");
+        if(hfp!=null)hfp.start(); // retry HFP registration after BLE permission granted
         return START_STICKY;
     }
     @Override public void onDestroy(){
         h.removeCallbacks(loop);
         if(registered)unregisterReceiver(musicReceiver);
         if(phone!=null)phone.stop();
+        if(hfp!=null)hfp.stop();
         if(ble!=null)ble.stop();
         super.onDestroy();
     }
@@ -155,11 +161,16 @@ public final class MediaBridgeService extends Service {
                 preferRadio ? "RADIO / " + media.state :
                 !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
 
-        // Phone overrides media only while a call is active. FM/MP3 logic below remains unchanged.
-        if (phone!=null && phone.isActive()) {
-            diag("route", "TELEFON / " + phone.status());
-            if(ble.ready() && (!phoneDisplayed || now-lastPhoneSent>=10000)) {
-                ble.send("PHONE:" + phone.display()); // no T|: fixed prefix belongs to ESP
+        // HFP calls from a paired phone take priority over local TelephonyManager.
+        // Never change the existing DAB, FM, MP3, YouTube or MP4 media routing.
+        boolean hfpActive = hfp!=null && hfp.active();
+        boolean localCall = !hfpActive && phone!=null && phone.isActive();
+        if(hfpActive || localCall) {
+            String caller = hfpActive ? hfp.display() : phone.display();
+            diag("route", "TELEFON / " + (hfpActive ? hfp.status() : phone.status()));
+            if(ble.ready() && (!phoneDisplayed || !caller.equals(lastPhoneText) || now-lastPhoneSent>=10000)) {
+                ble.send("PHONE:" + caller); // ESP owns the fixed T| prefix
+                lastPhoneText=caller;
                 phoneDisplayed=true;
                 lastPhoneSent=now;
             }
@@ -169,6 +180,7 @@ public final class MediaBridgeService extends Service {
             if(ble.ready()) ble.send("PHONE:STOP");
             phoneDisplayed=false;
             lastPhoneSent=0;
+            lastPhoneText="";
             oldMedia=oldFreq=oldStation=oldDab="";
             sentMedia=sentRadio=sentStation=sentDab=0;
         }
