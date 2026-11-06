@@ -73,20 +73,22 @@ public final class RadioAccessibilityService extends AccessibilityService {
         if (!radio && !mp3) return;
 
         List<String> strings = new ArrayList<>();
+        List<String> screenLabels = new ArrayList<>();
+        List<String> eventLabels = new ArrayList<>();
         if (event != null) {
             if (event.getText() != null)
                 for (CharSequence text : event.getText())
-                    if (text != null) addUnique(strings, text.toString());
+                    if (text != null) { addUnique(strings, text.toString()); addUnique(eventLabels, text.toString()); }
             if (event.getContentDescription() != null)
-                addUnique(strings, event.getContentDescription().toString());
+                { addUnique(strings, event.getContentDescription().toString()); addUnique(eventLabels, event.getContentDescription().toString()); }
         }
         ArrayDeque<AccessibilityNodeInfo> queue = new ArrayDeque<>();
         if (root != null) queue.add(root);
         int visited = 0;
         while (!queue.isEmpty() && visited++ < 250) {
             AccessibilityNodeInfo node = queue.removeFirst();
-            if (node.getText() != null) addUnique(strings, node.getText().toString());
-            if (node.getContentDescription() != null) addUnique(strings, node.getContentDescription().toString());
+            if (node.getText() != null) { addUnique(strings, node.getText().toString()); addUnique(screenLabels, node.getText().toString()); }
+            if (node.getContentDescription() != null) { addUnique(strings, node.getContentDescription().toString()); addUnique(screenLabels, node.getContentDescription().toString()); }
             for (int i = 0; i < node.getChildCount(); i++) {
                 AccessibilityNodeInfo child = node.getChild(i);
                 if (child != null) queue.add(child);
@@ -112,29 +114,53 @@ public final class RadioAccessibilityService extends AccessibilityService {
         }
 
         String freq = "";
-        String station = "";
         for (String item : strings) {
             String detected = SourceRouter.frequency(item);
             if (!detected.isEmpty()) { freq = detected; break; }
-        }
-        // Accept all plausible station names, not only a fixed list of broadcasters.
-        for (String item : strings) {
-            if (SourceRouter.validStation(item) && item.length() > station.length()) station = item;
         }
 
         android.content.SharedPreferences pref = getSharedPreferences("krupas_radio", MODE_PRIVATE);
         String previousFreq = pref.getString("freq", "");
         String previousStation = pref.getString("station", "");
         boolean tuned = !freq.isEmpty() && !freq.equals(previousFreq);
+
+        // The station name and the changing RDS line are separate fields.
+        // The visible radio view is preferred over event-only labels: events
+        // often begin with the currently changing RDS text.
+        List<String> labels = new ArrayList<>();
+        for (String item : screenLabels)
+            if (SourceRouter.validStation(item) && !item.equalsIgnoreCase("NavRadio+")
+                    && !item.equalsIgnoreCase("NavRadio")) addUnique(labels, item);
+        String station = "";
+        if (!tuned && !previousStation.isEmpty()) {
+            for (String item : labels)
+                if (item.equalsIgnoreCase(previousStation)) { station = item; break; }
+        }
+        if (station.isEmpty() && !labels.isEmpty()) station = labels.get(0);
+        String rds = "";
+        for (String item : labels) {
+            if (!item.equalsIgnoreCase(station)) { rds = item; break; }
+        }
+        // Some radio builds expose the second line only in accessibility events.
+        if (rds.isEmpty() && !station.isEmpty()) {
+            for (String item : eventLabels) {
+                if (SourceRouter.validStation(item) && !item.equalsIgnoreCase(station)) {
+                    rds = item; break;
+                }
+            }
+        }
         String resolvedStation = !station.isEmpty() ? station : (tuned ? "" : previousStation);
 
         android.content.SharedPreferences.Editor e = pref.edit()
                 .putString("pkg", pkg)
                 .putString("nodes", strings.toString())
-                .putBoolean("visible", true);
+                .putBoolean("visible", true)
+                .putString("station", resolvedStation)
+                .putString("rds", rds)
+                .putLong("rds_seen", rds.isEmpty() ? 0 : now);
         if (!freq.isEmpty()) e.putString("freq", freq);
-        if (!station.isEmpty() || tuned) e.putString("station", resolvedStation);
-        // A visible FM screen is a heartbeat even if its label is static.
+        // Do not keep radiotext from the station tuned previously.
+        if (tuned && rds.isEmpty()) e.remove("rds");
         if (!freq.isEmpty() || !station.isEmpty() ||
                 (!previousFreq.isEmpty() || !previousStation.isEmpty()) && root != null) {
             e.putLong("seen", now);
