@@ -35,12 +35,20 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2-navradio-K706.apk
-          sha256sum KRUPAS-Media-Pro-1.2-navradio-K706.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
+          sha256sum KRUPAS-Media-Pro-1.2-navradio-K706.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.2-navradio-K706-APK
-          path: KRUPAS-Media-Pro-1.2-navradio-K706.apk
+          name: KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST-APK
+          path: KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
           if-no-files-found: error
+      - name: Opublikuj osobny testowy APK dla K706
+        if: github.ref == 'refs/heads/fix/k706-rds-larger-fonts-20261106'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create 'v1.2.1-navradio-k706-rds-test' KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.2.1 K706 - RDS TEST' --notes 'Test dynamicznego RDS i wiekszych czcionek. Guziki zostaja poziomo. Debug signing: instalacja na poprzedniej wersji wymaga zgodnego certyfikatu.' --prerelease
+        continue-on-error: true
       - name: Opublikuj instalator w GitHub Releases
         if: github.ref == 'refs/heads/main'
         env:
