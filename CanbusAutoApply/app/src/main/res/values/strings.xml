@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TELE TECHNIKA CANBUS Auto</string>
+    <string name="service_name">CANBUS Auto – sterowanie</string>
+    <string name="service_description">Usługa obserwuje ekran, aby zapamiętać przycisk Zapisz w ustawieniach CANBUS i spróbować nacisnąć go po wybudzeniu radia. Wymaga ręcznego włączenia i może nie działać z fabryczną aplikacją.</string>
+</resources>
