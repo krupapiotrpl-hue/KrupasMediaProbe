@@ -62,9 +62,29 @@ final class SourceRouter {
         return "";
     }
 
+    // DAB-Z is a separate digital source, not analog FM/RDS.
+    static boolean isDabPackage(String pkg) {
+        return pkg != null && (pkg.equalsIgnoreCase("com.zoulou.dab") ||
+                pkg.toLowerCase(Locale.ROOT).contains("dabz"));
+    }
+
+    static String dabDisplay(String... values) {
+        java.util.LinkedHashSet<String> parts = new java.util.LinkedHashSet<>();
+        for (String value : values) {
+            String s = clean(value);
+            String u = s.toUpperCase(Locale.ROOT);
+            if (s.isEmpty() || u.equals("DAB") || u.equals("DAB+") ||
+                    u.equals("DAB-Z") || u.equals("DAB Z") ||
+                    u.equals("DAB-Z PLAYER") || u.equals("USB")) continue;
+            if (!parts.contains(s)) parts.add(s);
+        }
+        return clean(androidFreeJoin(parts));
+    }
+
     static boolean isRadioPackage(String pkg) {
         if (pkg == null) return false;
         String p = pkg.toLowerCase(Locale.ROOT);
+        if (isDabPackage(pkg)) return false;
         return p.contains("radio") || p.contains("navimod") || p.contains("fmplayer") || p.contains("fmradio");
     }
 
