@@ -33,6 +33,37 @@ public class MediaProbeNotificationService extends NotificationListenerService {
         return out;
     }
 
+    // For versions of DAB-Z that expose metadata only through a foreground notification.
+    static MediaBridgeService.MediaResult activeDab(android.content.Context context) {
+        MediaBridgeService.MediaResult out = new MediaBridgeService.MediaResult();
+        MediaProbeNotificationService service = connected;
+        if (service == null) return out;
+        try {
+            StatusBarNotification[] active = service.getActiveNotifications();
+            if (active == null) return out;
+            for (StatusBarNotification sbn : active) {
+                if (!SourceRouter.isDabPackage(sbn.getPackageName())) continue;
+                Notification n = sbn.getNotification();
+                if (n == null || !sbn.isOngoing()) continue;
+                String title = SourceRouter.dabDisplay(
+                        text(n.extras, Notification.EXTRA_TITLE),
+                        text(n.extras, Notification.EXTRA_TEXT),
+                        text(n.extras, Notification.EXTRA_BIG_TEXT),
+                        text(n.extras, Notification.EXTRA_SUB_TEXT));
+                if (title.isEmpty()) continue;
+                out.dab = true;
+                out.pkg = sbn.getPackageName();
+                out.title = title;
+                out.state = "DAB NOTIFICATION";
+                return out;
+            }
+        } catch (Exception ex) {
+            context.getSharedPreferences("krupas_diag",0).edit()
+                    .putString("dab_notification_error",ex.toString()).apply();
+        }
+        return out;
+    }
+
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || sbn.getNotification() == null) return;
