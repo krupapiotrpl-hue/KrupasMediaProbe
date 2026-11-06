@@ -51,6 +51,7 @@ public final class MainActivity extends Activity {
         addButton(buttons,"Start BLE",()->startBridge(null));
         addButton(buttons,"Test FM",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
         addButton(buttons,"Test MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
+        addButton(buttons,"Test telefonu",()->startBridge(MediaBridgeService.ACTION_TEST_PHONE));
         addButton(buttons,"Kopiuj",()->{
             android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
             if(clipboard!=null && status!=null)clipboard.setPrimaryClip(android.content.ClipData.newPlainText("KRUPAS diagnostyka",status.getText()));
@@ -103,6 +104,7 @@ public final class MainActivity extends Activity {
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
                 "HFP BLUETOOTH: "+d.getString("hfp_status","BRAK") +"\n"+
+                "TEST TELEFONU: "+d.getString("phone_test","—")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "DAB+: "+d.getString("dab_status","BRAK")+"\n"+
                 "RDS DYNAMICZNY: "+d.getString("rds_status","BRAK")+"\n"+
