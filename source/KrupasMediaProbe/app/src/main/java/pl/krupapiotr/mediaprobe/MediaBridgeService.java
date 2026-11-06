@@ -27,6 +27,7 @@ import java.util.List;
 public final class MediaBridgeService extends Service {
     static final String ACTION_TEST_FM="pl.krupapiotr.mediaprobe.TEST_FM";
     static final String ACTION_TEST_MP3="pl.krupapiotr.mediaprobe.TEST_MP3";
+    static final String ACTION_TEST_PHONE="pl.krupapiotr.mediaprobe.TEST_PHONE";
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
     private PhoneCallMonitor phone;
@@ -34,6 +35,7 @@ public final class MediaBridgeService extends Service {
     private boolean phoneDisplayed;
     private String lastPhoneText="";
     private long lastPhoneSent;
+    private long testPhoneUntil;
     private boolean registered;
     private String oldMedia="",oldFreq="",oldStation="",oldDab="";
     private long sentMedia, sentRadio, sentStation, sentDab;
@@ -64,6 +66,11 @@ public final class MediaBridgeService extends Service {
             ble.send("FM:107.0"); ble.send("RDS:TEST FM");
         }
         if(intent!=null && ACTION_TEST_MP3.equals(intent.getAction())) ble.send("TITLE:KRUPAS TEST MP3");
+        if(intent!=null && ACTION_TEST_PHONE.equals(intent.getAction())) {
+            testPhoneUntil=System.currentTimeMillis()+6000;
+            phoneDisplayed=false; // force test message even after an earlier test
+            diag("phone_test","TEST 6 SEKUND; PHONE:OFF konczy test");
+        }
         if(hfp!=null)hfp.start(); // retry HFP registration after BLE permission granted
         return START_STICKY;
     }
@@ -171,9 +178,12 @@ public final class MediaBridgeService extends Service {
         // Never change the existing DAB, FM, MP3, YouTube or MP4 media routing.
         boolean hfpActive = hfp!=null && hfp.active();
         boolean localCall = !hfpActive && phone!=null && phone.isActive();
-        if(hfpActive || localCall) {
-            String caller = hfpActive ? hfp.display() : phone.display();
-            diag("route", "TELEFON / " + (hfpActive ? hfp.status() : phone.status()));
+        if(hfpActive || localCall) testPhoneUntil=0;
+        boolean testCall = !hfpActive && !localCall && now<testPhoneUntil;
+        if(hfpActive || localCall || testCall) {
+            String caller = hfpActive ? hfp.display() : (localCall ? phone.display() : "TEST TELEFONU");
+            diag("route", testCall ? "TELEFON / TEST" : "TELEFON / " +
+                    (hfpActive ? hfp.status() : phone.status()));
             if(ble.ready() && (!phoneDisplayed || !caller.equals(lastPhoneText) || now-lastPhoneSent>=10000)) {
                 ble.send("PHONE:" + caller); // ESP owns the fixed T| prefix
                 lastPhoneText=caller;
@@ -183,7 +193,7 @@ public final class MediaBridgeService extends Service {
             return;
         }
         if(phoneDisplayed) {
-            if(ble.ready()) ble.send("PHONE:STOP");
+            if(ble.ready()) ble.send("PHONE:OFF");
             phoneDisplayed=false;
             lastPhoneSent=0;
             lastPhoneText="";
