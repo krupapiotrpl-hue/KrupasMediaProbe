@@ -25,7 +25,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 AccessibilityNodeInfo root = getRootInActiveWindow();
                 if (root != null && root.getPackageName() != null) {
                     String pkg = root.getPackageName().toString();
-                    if (SourceRouter.isRadioPackage(pkg) || SourceRouter.isAudioPackage(pkg)) {
+                    if (SourceRouter.isRadioPackage(pkg) || SourceRouter.isAudioPackage(pkg) || SourceRouter.isDabPackage(pkg)) {
                         capture(pkg, null, root);
                     }
                 }
@@ -45,15 +45,18 @@ public final class RadioAccessibilityService extends AccessibilityService {
         if (event == null || event.getPackageName() == null) return;
         String pkg = event.getPackageName().toString();
         boolean radio = SourceRouter.isRadioPackage(pkg);
-        boolean mp3 = SourceRouter.isAudioPackage(pkg) && !radio;
+        boolean dab = SourceRouter.isDabPackage(pkg);
+        boolean mp3 = SourceRouter.isAudioPackage(pkg) && !radio && !dab;
 
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             getSharedPreferences("krupas_radio", MODE_PRIVATE).edit()
                     .putBoolean("visible", radio).apply();
             getSharedPreferences("krupas_mp3_ui", MODE_PRIVATE).edit()
                     .putBoolean("visible", mp3).apply();
+            getSharedPreferences("krupas_dab_ui", MODE_PRIVATE).edit()
+                    .putBoolean("visible", dab).apply();
         }
-        if (!radio && !mp3) return;
+        if (!radio && !mp3 && !dab) return;
 
         long now = android.os.SystemClock.elapsedRealtime();
         if (now - lastScan < 250 &&
@@ -69,8 +72,9 @@ public final class RadioAccessibilityService extends AccessibilityService {
 
     private void capture(String pkg, AccessibilityEvent event, AccessibilityNodeInfo root) {
         boolean radio = SourceRouter.isRadioPackage(pkg);
-        boolean mp3 = SourceRouter.isAudioPackage(pkg) && !radio;
-        if (!radio && !mp3) return;
+        boolean dab = SourceRouter.isDabPackage(pkg);
+        boolean mp3 = SourceRouter.isAudioPackage(pkg) && !radio && !dab;
+        if (!radio && !mp3 && !dab) return;
 
         List<String> strings = new ArrayList<>();
         List<String> screenLabels = new ArrayList<>();
@@ -95,6 +99,26 @@ public final class RadioAccessibilityService extends AccessibilityService {
             }
         }
         long now = System.currentTimeMillis();
+        if (dab) {
+            String candidate = "";
+            // Best-effort on-screen DLS/station fallback, never a stale background UI.
+            for (String item : strings) {
+                String u=item.toUpperCase(java.util.Locale.ROOT);
+                if (item.length()<3 || item.length()>90 || !item.matches(".*[\\p{L}].*")) continue;
+                if (u.equals("DAB-Z") || u.equals("DAB+") || u.equals("DAB") ||
+                        u.equals("USB") || u.equals("RADIO") || u.equals("SETTINGS") ||
+                        u.equals("SCAN") || u.equals("SEARCH") || u.equals("PLAY") ||
+                        u.equals("STOP") || u.equals("FAVORITES")) continue;
+                candidate=item;
+                break;
+            }
+            android.content.SharedPreferences.Editor e=getSharedPreferences("krupas_dab_ui",MODE_PRIVATE)
+                    .edit().putString("pkg",pkg).putString("nodes",strings.toString())
+                    .putBoolean("visible",true);
+            if (!candidate.isEmpty())e.putString("title",candidate).putLong("seen",now);
+            e.apply();
+            return;
+        }
         if (mp3) {
             String title = "";
             for (String item : strings) {
