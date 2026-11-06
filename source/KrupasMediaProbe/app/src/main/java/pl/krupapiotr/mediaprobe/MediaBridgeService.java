@@ -97,13 +97,15 @@ public final class MediaBridgeService extends Service {
         final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
         final String freq = SourceRouter.clean(radio.getString("freq", ""));
         String station = SourceRouter.clean(radio.getString("station", ""));
+        final String screenRds = SourceRouter.clean(radio.getString("rds", ""));
+        final long rdsSeen = radio.getLong("rds_seen", 0);
         final long radioSeen = radio.getLong("seen", 0);
         final boolean radioVisible = radio.getBoolean("visible", false);
         // The accessibility window may be hidden while the radio keeps playing.
         // Accept only recent captured metadata; never treat cached text as indefinitely live.
         boolean radioLive = radioSeen > 0 &&
                 now >= radioSeen && now - radioSeen <= 25000 &&
-                (!freq.isEmpty() || !station.isEmpty());
+                (!freq.isEmpty() || !station.isEmpty() || !screenRds.isEmpty());
 
         MediaResult media = findPlayingMedia();
         if (media.title.isEmpty() && !radioSessionStopped) {
@@ -123,6 +125,14 @@ public final class MediaBridgeService extends Service {
                      media.pkg.equals(radio.getString("pkg", "")) ? station : "");
         }
 
+        // Prefer fresh RDS from the same radio over the fixed station label.
+        boolean rdsCurrent = radioLive && rdsSeen > 0 && now >= rdsSeen &&
+                now - rdsSeen <= 25000 && !screenRds.isEmpty() &&
+                !screenRds.equalsIgnoreCase(station) &&
+                (media.pkg.isEmpty() || media.pkg.equals(radio.getString("pkg", "")));
+        final String radioText = rdsCurrent ? screenRds : station;
+        diag("rds_status", "station=" + station + " / rds=" + screenRds +
+                " / active=" + rdsCurrent + " / age=" + (rdsSeen == 0 ? -1 : now - rdsSeen));
         diag("media_status", media.pkg + " / " + media.title + " / " + media.state);
         diag("radio_status", radio.getString("pkg", "") + " / " + freq +
                 " / " + station + " / age=" + (radioSeen == 0 ? -1 : now - radioSeen) +
@@ -165,7 +175,7 @@ public final class MediaBridgeService extends Service {
             }
 
             final boolean frequencyChanged = !freq.equals(oldFreq);
-            final boolean stationChanged = !station.equals(oldStation);
+            final boolean stationChanged = !radioText.equals(oldStation);
 
             if (frequencyChanged && !oldFreq.isEmpty()) {
                 // Invalidate previous station only on actual retuning.
@@ -178,11 +188,11 @@ public final class MediaBridgeService extends Service {
             oldFreq = freq;
             sentRadio = now;
 
-            if (!station.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
-                ble.send("RDS:" + station);
-                oldStation = station;
+            if (!radioText.isEmpty() && (frequencyChanged || stationChanged || now - sentStation >= 10000)) {
+                ble.send("RDS:" + radioText);
+                oldStation = radioText;
                 sentStation = now;
-            } else if (station.isEmpty() && !oldStation.isEmpty()) {
+            } else if (radioText.isEmpty() && !oldStation.isEmpty()) {
                 ble.send("CLEAR:RDS");
                 oldStation = "";
             }
