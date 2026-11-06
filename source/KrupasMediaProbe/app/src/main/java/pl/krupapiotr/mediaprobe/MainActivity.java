@@ -94,6 +94,7 @@ public final class MainActivity extends Activity {
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
+                "RDS DYNAMICZNY: "+d.getString("rds_status","BRAK")+"\n"+
                 "NOTYFIKACJE: "+(notificationListeners!=null&&notificationListeners.contains(getPackageName())?"OK":"BRAK UPRAWNIEŃ")+"\n"+
                 "DOSTĘPNOŚĆ RADIO: "+(accessibility!=null&&accessibility.contains(getPackageName()+"/"+RadioAccessibilityService.class.getName())?"OK":"SPRAWDŹ")+"\n\n"+
                 "OSTATNI EKRAN FM: "+r.getString("nodes","brak")+"\n\n"+
