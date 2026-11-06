@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TELE TECHNIKA CANBUS Auto 0.2</string>
+    <string name="service_name">CANBUS Auto 0.2 – dotknięcia</string>
+    <string name="service_description">Za zgodą użytkownika zapamiętuje współrzędne punktów interfejsu fabrycznego radia i odtwarza je, aby ponownie zatwierdzić wybrany CANBUS. Nie wymaga root, nie odczytuje danych i nie łączy się z siecią. Używać wyłącznie na postoju.</string>
+</resources>
