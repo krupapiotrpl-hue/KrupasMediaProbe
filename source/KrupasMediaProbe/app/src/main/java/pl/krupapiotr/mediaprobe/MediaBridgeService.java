@@ -178,12 +178,19 @@ public final class MediaBridgeService extends Service {
         // Never change the existing DAB, FM, MP3, YouTube or MP4 media routing.
         boolean hfpActive = hfp!=null && hfp.active();
         boolean localCall = !hfpActive && phone!=null && phone.isActive();
-        if(hfpActive || localCall) testPhoneUntil=0;
-        boolean testCall = !hfpActive && !localCall && now<testPhoneUntil;
-        if(hfpActive || localCall || testCall) {
-            String caller = hfpActive ? hfp.display() : (localCall ? phone.display() : "TEST TELEFONU");
-            diag("route", testCall ? "TELEFON / TEST" : "TELEFON / " +
-                    (hfpActive ? hfp.status() : phone.status()));
+        SharedPreferences phoneUi=getSharedPreferences("krupas_phone_ui",0);
+        long uiSeen=phoneUi.getLong("seen",0);
+        boolean uiCall=!hfpActive && !localCall && phoneUi.getBoolean("active",false)
+                && uiSeen>0 && now>=uiSeen && now-uiSeen<=8000;
+        if(hfpActive || localCall || uiCall) testPhoneUntil=0;
+        boolean testCall = !hfpActive && !localCall && !uiCall && now<testPhoneUntil;
+        if(hfpActive || localCall || uiCall || testCall) {
+            String caller = hfpActive ? hfp.display() :
+                    (localCall ? phone.display() :
+                    (uiCall ? phoneUi.getString("display","ROZMOWA") : "TEST TELEFONU"));
+            diag("route", testCall ? "TELEFON / TEST" :
+                    (uiCall ? "TELEFON / OKNO K706" : "TELEFON / " +
+                    (hfpActive ? hfp.status() : phone.status())));
             if(ble.ready() && (!phoneDisplayed || !caller.equals(lastPhoneText) || now-lastPhoneSent>=10000)) {
                 ble.send("PHONE:" + caller); // ESP owns the fixed T| prefix
                 lastPhoneText=caller;

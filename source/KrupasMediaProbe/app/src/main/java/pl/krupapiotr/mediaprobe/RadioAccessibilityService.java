@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
     private long lastScan;
     private boolean connected;
     private long lastStartRequest;
+    private long lastPhoneScan;
     private final Runnable sampler = new Runnable() {
         @Override public void run() {
             if (!connected) return;
@@ -30,8 +32,9 @@ public final class RadioAccessibilityService extends AccessibilityService {
                         capture(pkg, null, root);
                     }
                 }
+                scanPhoneWindows(null);
             } catch (Exception ignored) {}
-            handler.postDelayed(this, 5000);
+            handler.postDelayed(this, 2000);
         }
     };
 
@@ -67,6 +70,8 @@ public final class RadioAccessibilityService extends AccessibilityService {
             getSharedPreferences("krupas_dab_ui", MODE_PRIVATE).edit()
                     .putBoolean("visible", dab).apply();
         }
+        // Passive Bluetooth phone window monitor; media parsing stays unchanged.
+        scanPhoneWindows(event);
         if (!radio && !mp3 && !dab) return;
 
         long now = android.os.SystemClock.elapsedRealtime();
@@ -201,6 +206,78 @@ public final class RadioAccessibilityService extends AccessibilityService {
             e.putLong("seen", now);
         }
         e.apply();
+    }
+
+    // A separate, read-only phone UI path for K706 builds that hide HFP broadcasts.
+    private void scanPhoneWindows(AccessibilityEvent event) {
+        long uptime=android.os.SystemClock.elapsedRealtime();
+        if(event!=null && uptime-lastPhoneScan<600 &&
+                event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
+        lastPhoneScan=uptime;
+        PhoneUiDetector.Result detected=null;
+        try {
+            List<AccessibilityWindowInfo> windows=getWindows();
+            if(windows!=null)for(AccessibilityWindowInfo window:windows) {
+                if(window==null)continue;
+                AccessibilityNodeInfo root=window.getRoot();
+                if(root==null || root.getPackageName()==null)continue;
+                String pkg=root.getPackageName().toString();
+                if(!PhoneUiDetector.isCandidate(pkg))continue;
+                PhoneUiDetector.Result result=readPhoneWindow(pkg,root,null);
+                if(result.active){detected=result;break;}
+                if(detected==null)detected=result;
+            }
+        } catch(Exception ex) {
+            getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
+                    .putString("status","ODCZYT OKIEN: "+ex.getClass().getSimpleName()).apply();
+        }
+        if(event!=null && event.getPackageName()!=null) {
+            String pkg=event.getPackageName().toString();
+            if(PhoneUiDetector.isCandidate(pkg) && (detected==null||!detected.active)) {
+                AccessibilityNodeInfo root=getRootInActiveWindow();
+                if(root!=null && root.getPackageName()!=null &&
+                        !pkg.equals(root.getPackageName().toString()))root=null;
+                PhoneUiDetector.Result result=readPhoneWindow(pkg,root,event);
+                if(result.active||detected==null)detected=result;
+            }
+        }
+        if(detected!=null) {
+            android.content.SharedPreferences.Editor edit=getSharedPreferences("krupas_phone_ui",MODE_PRIVATE)
+                    .edit().putBoolean("active",detected.active)
+                    .putString("pkg",detected.pkg)
+                    .putString("status",detected.diagnostic)
+                    .putLong("seen",System.currentTimeMillis());
+            if(detected.active)edit.putString("display",detected.display);
+            else edit.remove("display");
+            edit.apply();
+        }
+        // No visible phone window: the bridge expires the observation after 8 seconds.
+    }
+
+    private PhoneUiDetector.Result readPhoneWindow(String pkg,
+            AccessibilityNodeInfo root,AccessibilityEvent event) {
+        List<String> labels=new ArrayList<>();
+        if(event!=null) {
+            if(event.getText()!=null)for(CharSequence s:event.getText())
+                if(s!=null)addUnique(labels,s.toString());
+            if(event.getContentDescription()!=null)
+                addUnique(labels,event.getContentDescription().toString());
+        }
+        ArrayDeque<AccessibilityNodeInfo> nodes=new ArrayDeque<>();
+        if(root!=null)nodes.add(root);
+        int inspected=0;
+        while(!nodes.isEmpty() && inspected++<280) {
+            AccessibilityNodeInfo n=nodes.removeFirst();
+            if(n.getText()!=null)addUnique(labels,n.getText().toString());
+            if(n.getContentDescription()!=null)
+                addUnique(labels,n.getContentDescription().toString());
+            if(n.getViewIdResourceName()!=null)addUnique(labels,n.getViewIdResourceName());
+            for(int i=0;i<n.getChildCount();i++) {
+                AccessibilityNodeInfo c=n.getChild(i);
+                if(c!=null)nodes.add(c);
+            }
+        }
+        return PhoneUiDetector.detect(pkg,labels);
     }
 
     private static void addUnique(List<String> out, String text) {
