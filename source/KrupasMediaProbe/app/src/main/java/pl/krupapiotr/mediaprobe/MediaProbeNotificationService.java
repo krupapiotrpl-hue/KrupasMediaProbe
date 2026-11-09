@@ -7,7 +7,11 @@ import android.service.notification.StatusBarNotification;
 
 public class MediaProbeNotificationService extends NotificationListenerService {
     private static volatile MediaProbeNotificationService connected;
-    @Override public void onListenerConnected() { connected=this; }
+    @Override public void onListenerConnected() {
+        super.onListenerConnected();
+        connected=this;
+        BootReceiver.startBridge(this, "NOTIFICATION_LISTENER_CONNECTED");
+    }
     @Override public void onListenerDisconnected() { connected=null; }
     @Override public void onDestroy() { if(connected==this)connected=null;super.onDestroy(); }
 

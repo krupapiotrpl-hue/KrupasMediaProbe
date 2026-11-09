@@ -44,7 +44,7 @@ jobs:
           cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
           sha256sum KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
       - uses: actions/upload-artifact@v4
-        if: github.ref != 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
+        if: github.ref != 'refs/heads/fix/k706-131-phone-mp3-safe-20261106' && github.ref != 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
         with:
           name: KRUPAS-Media-Pro-K706-APK
           path: KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
@@ -55,6 +55,27 @@ jobs:
           name: KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST-APK
           path: KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
           if-no-files-found: error
+      - name: Przygotuj instalator 1.3.2
+        if: github.ref == 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
+        run: |
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk
+          sha256sum KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
+        with:
+          name: KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706-APK
+          path: KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk
+          if-no-files-found: error
+      - name: Publikuj testowe wydanie 1.3.2
+        if: github.ref == 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view 'v1.3.2-autostart-youtube-k706' >/dev/null 2>&1; then
+            gh release create 'v1.3.2-autostart-youtube-k706' KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.2 K706 - autostart i YouTube' --notes 'TEST: autostart po rozruchu i wznowieniu uslug systemowych; YouTube wysyla YT: zamiast TITLE:; przyciski pozostaja poziomo z przewijaniem; zachowane DAB, telefon i RDS. APK debug, wymaga testu w K706; kompatybilnosc podpisu z obecna instalacja niepotwierdzona.' --prerelease
+          else
+            gh release upload 'v1.3.2-autostart-youtube-k706' KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk --clobber
+          fi
       - name: Publikuj osobna testowa wersje 1.3.1 bez nadpisania 1.3.0
         if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
         env:

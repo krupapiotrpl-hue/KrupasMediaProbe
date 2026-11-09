@@ -18,6 +18,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastScan;
     private boolean connected;
+    private long lastStartRequest;
     private final Runnable sampler = new Runnable() {
         @Override public void run() {
             if (!connected) return;
@@ -37,6 +38,8 @@ public final class RadioAccessibilityService extends AccessibilityService {
     @Override protected void onServiceConnected() {
         super.onServiceConnected();
         connected = true;
+        BootReceiver.startBridge(this, "ACCESSIBILITY_CONNECTED");
+        lastStartRequest = android.os.SystemClock.elapsedRealtime();
         handler.removeCallbacks(sampler);
         handler.postDelayed(sampler, 2000);
     }
@@ -44,6 +47,14 @@ public final class RadioAccessibilityService extends AccessibilityService {
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null || event.getPackageName() == null) return;
         String pkg = event.getPackageName().toString();
+        // On some K706 firmware standby does not broadcast BOOT_COMPLETED.
+        // A newly visible music window can request the already-idempotent service.
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+                android.os.SystemClock.elapsedRealtime() - lastStartRequest > 60000 &&
+                (SourceRouter.isRadioPackage(pkg) || SourceRouter.isAudioPackage(pkg) || SourceRouter.isDabPackage(pkg))) {
+            lastStartRequest = android.os.SystemClock.elapsedRealtime();
+            BootReceiver.startBridge(this, "MEDIA_WINDOW");
+        }
         boolean radio = SourceRouter.isRadioPackage(pkg);
         boolean dab = SourceRouter.isDabPackage(pkg);
         boolean mp3 = SourceRouter.isAudioPackage(pkg) && !radio && !dab;

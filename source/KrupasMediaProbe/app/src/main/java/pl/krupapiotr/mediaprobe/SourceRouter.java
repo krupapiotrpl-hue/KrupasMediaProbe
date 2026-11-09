@@ -62,6 +62,13 @@ final class SourceRouter {
         return "";
     }
 
+    // YouTube carries its own source tag to prevent stale R| from NavRadio+.
+    static boolean isYouTubePackage(String pkg) {
+        if (pkg == null) return false;
+        String p = pkg.toLowerCase(Locale.ROOT);
+        return p.contains("youtube") || p.contains("youtu.be");
+    }
+
     // DAB-Z is a separate digital source, not analog FM/RDS.
     static boolean isDabPackage(String pkg) {
         return pkg != null && (pkg.equalsIgnoreCase("com.zoulou.dab") ||

@@ -17,6 +17,13 @@ public class SourceRouterTest {
         assertEquals("Africa - TOTO",SourceRouter.radioDisplay("TODO","Africa","TOTO",""));
         assertEquals("",SourceRouter.radioDisplay("FM 101.1","NavRadio+","TODO",""));
     }
+    @Test public void recognizesYouTubeSeparatelyFromMp3() {
+        assertTrue(SourceRouter.isYouTubePackage("com.google.android.youtube"));
+        assertTrue(SourceRouter.isYouTubePackage("com.google.android.apps.youtube.music"));
+        assertFalse(SourceRouter.isYouTubePackage("com.navimods.radio"));
+        assertFalse(SourceRouter.isLocalMp3Package("com.google.android.youtube"));
+        assertTrue(SourceRouter.isLocalMp3Package("com.android.music"));
+    }
     @Test public void recognizesNavRadioAsRadio() {
         assertTrue(SourceRouter.isRadioPackage("com.navimods.radio"));
         assertFalse(SourceRouter.isRadioPackage("com.android.music"));

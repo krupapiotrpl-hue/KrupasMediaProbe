@@ -37,7 +37,7 @@ public final class MediaBridgeService extends Service {
     private long lastPhoneSent;
     private long testPhoneUntil;
     private boolean registered;
-    private String oldMedia="",oldFreq="",oldStation="",oldDab="";
+    private String oldMedia="",oldMediaSource="",oldFreq="",oldStation="",oldDab="";
     private long sentMedia, sentRadio, sentStation, sentDab;
     private boolean radioSessionStopped;
     private final Runnable loop=new Runnable(){@Override public void run(){
@@ -49,7 +49,7 @@ public final class MediaBridgeService extends Service {
         super.onCreate();
         foreground();
         ble=new BleDisplayClient(this,()->{
-            oldMedia="";oldFreq="";oldStation="";oldDab="";sentMedia=sentRadio=sentStation=sentDab=0;
+            oldMedia="";oldMediaSource="";oldFreq="";oldStation="";oldDab="";sentMedia=sentRadio=sentStation=sentDab=0;
             phoneDisplayed=false;lastPhoneSent=0;lastPhoneText="";
             diag("connect",""+System.currentTimeMillis());
         });
@@ -172,7 +172,7 @@ public final class MediaBridgeService extends Service {
                 media.pkg + " / " + (media.dab ? media.title : "") + " / " + media.state);
         diag("route", preferDab ? "DAB+ / " + media.state :
                 preferRadio ? "RADIO / " + media.state :
-                !media.title.isEmpty() ? "MP3 / MEDIA" : "BRAK AKTYWNEGO ZRODLA");
+                !media.title.isEmpty() ? (SourceRouter.isYouTubePackage(media.pkg) ? "YOUTUBE" : "MP3 / MEDIA") : "BRAK AKTYWNEGO ZRODLA");
 
         // HFP calls from a paired phone take priority over local TelephonyManager.
         // Never change the existing DAB, FM, MP3, YouTube or MP4 media routing.
@@ -197,7 +197,7 @@ public final class MediaBridgeService extends Service {
             phoneDisplayed=false;
             lastPhoneSent=0;
             lastPhoneText="";
-            oldMedia=oldFreq=oldStation=oldDab="";
+            oldMedia=oldMediaSource=oldFreq=oldStation=oldDab="";
             sentMedia=sentRadio=sentStation=sentDab=0;
         }
 
@@ -212,7 +212,7 @@ public final class MediaBridgeService extends Service {
         if (!preferDab && !oldDab.isEmpty()) {
             ble.send(nativeDab ? "DAB:STOP" : "MEDIA:STOP");
             oldDab=""; sentDab=0;
-            oldMedia=""; sentMedia=0;
+            oldMedia=""; oldMediaSource=""; sentMedia=0;
         }
         if (preferDab) {
             if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
@@ -223,13 +223,14 @@ public final class MediaBridgeService extends Service {
             if (!media.title.equals(oldDab) || now-sentDab >= 10000) {
                 // For 1.9x17 TITLE becomes M|. Future ESP DAB:TEXT becomes D|.
                 ble.send(nativeDab ? "DAB:TEXT:" + media.title : "TITLE:" + media.title);
-                oldDab=media.title; oldMedia=media.title; sentDab=sentMedia=now;
+                oldDab=media.title; oldMedia=media.title; oldMediaSource="DAB"; sentDab=sentMedia=now;
             }
         }
         else if (preferRadio) {
             if (!oldMedia.isEmpty()) {
                 ble.send("MEDIA:STOP");
                 oldMedia = "";
+                oldMediaSource = "";
                 sentMedia = 0;
             }
 
@@ -264,9 +265,12 @@ public final class MediaBridgeService extends Service {
                 oldStation = "";
                 sentRadio = sentStation = 0;
             }
-            if (!media.title.equals(oldMedia) || now - sentMedia >= 10000) {
-                ble.send("TITLE:" + media.title);
+            // ESP understands YT:, while plain TITLE: may keep the old R| tag.
+            final String nextSource = SourceRouter.isYouTubePackage(media.pkg) ? "YT" : "MP3";
+            if (!media.title.equals(oldMedia) || !nextSource.equals(oldMediaSource) || now - sentMedia >= 10000) {
+                ble.send(("YT".equals(nextSource) ? "YT:" : "TITLE:") + media.title);
                 oldMedia = media.title;
+                oldMediaSource = nextSource;
                 sentMedia = now;
             }
         }
@@ -275,6 +279,7 @@ public final class MediaBridgeService extends Service {
             if (!oldMedia.isEmpty()) {
                 ble.send("MEDIA:STOP");
                 oldMedia = "";
+                oldMediaSource = "";
                 sentMedia = 0;
             }
             if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
