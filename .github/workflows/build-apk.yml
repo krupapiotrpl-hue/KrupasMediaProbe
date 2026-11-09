@@ -76,6 +76,17 @@ jobs:
           else
             gh release upload 'v1.3.2-autostart-youtube-k706' KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk --clobber
           fi
+      - name: Publish KMP 1.3.3 phone UI test
+        if: github.ref == 'refs/heads/fix/kmp-133-phone-ui-20261109'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.3-PHONE-UI-K706-TEST.apk
+          if gh release view 'v1.3.3-phone-ui-k706-test' >/dev/null 2>&1; then
+            gh release upload 'v1.3.3-phone-ui-k706-test' KRUPAS-Media-Pro-1.3.3-PHONE-UI-K706-TEST.apk --clobber
+          else
+            gh release create 'v1.3.3-phone-ui-k706-test' KRUPAS-Media-Pro-1.3.3-PHONE-UI-K706-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.3 - telefon K706 TEST' --notes 'Test odczytu okna telefonu K706 przez Accessibility. Dodano diagnostyke TELEFON OKNO K706. Pozostale zrodla FM MP3 YouTube DAB bez zmian. APK debug; instalacja na 1.3.2 moze wymagac odinstalowania z powodu podpisu.' --prerelease
+          fi
       - name: Publikuj osobna testowa wersje 1.3.1 bez nadpisania 1.3.0
         if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
         env:
