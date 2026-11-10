@@ -40,6 +40,8 @@ public final class MediaBridgeService extends Service {
     private String oldMedia="",oldMediaSource="",oldFreq="",oldStation="",oldDab="";
     private long sentMedia, sentRadio, sentStation, sentDab;
     private boolean radioSessionStopped;
+    // Only affects FM text; all other source routing remains unchanged.
+    private final StationRdsRotator stationRdsRotator = new StationRdsRotator();
     private final Runnable loop=new Runnable(){@Override public void run(){
         try{refresh();}catch(Exception e){diag("error",e.toString());}
         h.postDelayed(this,1500);
@@ -155,7 +157,6 @@ public final class MediaBridgeService extends Service {
                 now - rdsSeen <= 25000 && !screenRds.isEmpty() &&
                 !screenRds.equalsIgnoreCase(station) &&
                 (media.pkg.isEmpty() || media.pkg.equals(radio.getString("pkg", "")));
-        final String radioText = rdsCurrent ? screenRds : station;
         diag("rds_status", "station=" + station + " / rds=" + screenRds +
                 " / active=" + rdsCurrent + " / age=" + (rdsSeen == 0 ? -1 : now - rdsSeen));
         diag("media_status", media.pkg + " / " + media.title + " / " + media.state);
@@ -168,6 +169,17 @@ public final class MediaBridgeService extends Service {
         boolean playingSession = "PLAYING".equals(media.state) && !media.radio;
         boolean preferDab = media.dab && !media.title.isEmpty();
         boolean preferRadio = !preferDab && radioLive && !playingSession;
+        // When NavRadio+ provides a custom station label and live RDS, show
+        // the label for five seconds and the RDS text for five seconds.
+        // Keep the existing BLE RDS: protocol and the unchanged FM frequency line.
+        String radioText;
+        if (preferRadio) {
+            radioText = stationRdsRotator.select(now, freq, station,
+                    rdsCurrent ? screenRds : "");
+        } else {
+            stationRdsRotator.reset();
+            radioText = rdsCurrent ? screenRds : station;
+        }
         diag("dab_status", (preferDab ? "AKTYWNE" : "NIEAKTYWNE") + " / " +
                 media.pkg + " / " + (media.dab ? media.title : "") + " / " + media.state);
         diag("route", preferDab ? "DAB+ / " + media.state :
