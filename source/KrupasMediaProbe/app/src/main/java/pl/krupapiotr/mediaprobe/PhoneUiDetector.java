@@ -49,7 +49,7 @@ final class PhoneUiDetector {
         // The K706 vendor phone package is not fixed across ROM releases.
         // Unknown packages need strong call-window evidence to avoid false positives.
         if(!knownPhonePackage)
-            active=(end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
+            active=(end&&(!number.isEmpty()||(timer&&(outgoing||ringing)))) ||
                     (accept&&reject&&ringing);
         if("com.android.systemui".equalsIgnoreCase(pkg))
             active=(end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
