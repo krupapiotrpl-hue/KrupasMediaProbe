@@ -25,6 +25,18 @@ public class PhoneUiDetectorTest {
         assertTrue(PhoneUiDetector.detect("com.android.systemui",
                 Arrays.asList("End call","00:31")).active);
     }
+    @Test public void unknownVendorPackageNeedsStrongCallEvidence() {
+        PhoneUiDetector.Result yes=PhoneUiDetector.detect("com.vendor.proprietary",
+                Arrays.asList("End call","+48 501 234 567","00:31"));
+        assertTrue(yes.active);assertEquals("+48 501 234 567",yes.display);
+        assertFalse(yes.diagnostic.contains("501 234 567"));
+        assertFalse(PhoneUiDetector.detect("com.vendor.proprietary",
+                Arrays.asList("End call")).active);
+        assertFalse(PhoneUiDetector.detect("com.vendor.proprietary",
+                Arrays.asList("00:31","+48 501 234 567")).active);
+        assertFalse(PhoneUiDetector.detect("pl.krupapiotr.mediaprobe",
+                Arrays.asList("End call","+48 501 234 567","00:31")).active);
+    }
     @Test public void polishLabel() {
         assertTrue(PhoneUiDetector.detect("com.wits.ksw.bt",
                 Arrays.asList("Zakończ połączenie","01:20")).active);
