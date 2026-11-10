@@ -32,9 +32,8 @@ final class CallAudioMonitor {
                 if(players!=null) for(AudioPlaybackConfiguration p:players) {
                     if(p==null || p.getAudioAttributes()==null)continue;
                     int usage=p.getAudioAttributes().getUsage();
-                    if(p.getPlayerState()==AudioPlaybackConfiguration.PLAYER_STATE_STARTED &&
-                            (usage==AudioAttributes.USAGE_VOICE_COMMUNICATION ||
-                             usage==AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING))
+                    if(usage==AudioAttributes.USAGE_VOICE_COMMUNICATION ||
+                            usage==AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING)
                         voice=true;
                 }
             }
