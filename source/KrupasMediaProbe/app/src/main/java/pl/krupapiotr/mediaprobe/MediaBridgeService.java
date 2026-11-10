@@ -317,7 +317,12 @@ public final class MediaBridgeService extends Service {
             MediaSessionManager manager=(MediaSessionManager)getSystemService(MEDIA_SESSION_SERVICE);
             ComponentName listener=new ComponentName(this,MediaProbeNotificationService.class);
             List<MediaController> sessions=manager.getActiveSessions(listener);
-            if(sessions==null)return best;
+            if(sessions==null) {
+                diag("session_error","BRAK LISTY SESJI");
+                return best;
+            }
+            // The previous failure must not remain visible after successful access.
+            diag("session_error","OK");
             for(MediaController c:sessions){
                 PlaybackState state=c.getPlaybackState();
                 String pkg=c.getPackageName();
