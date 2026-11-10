@@ -126,7 +126,8 @@ final class HfpCallMonitor {
     String display() {
         String who = SourceRouter.clean(number);
         if (who.isEmpty()) who = "ROZMOWA";
-        return (outgoing ? "> " : "< ") + who;
+        // ESP supplies T|; do not insert additional direction markers.
+        return who;
     }
 
     private void log(String message) {
