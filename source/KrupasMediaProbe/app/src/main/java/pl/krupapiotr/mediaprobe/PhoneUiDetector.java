@@ -20,7 +20,9 @@ final class PhoneUiDetector {
     }
 
     static Result detect(String pkg,List<String> labels) {
-        if(!isCandidate(pkg))return new Result(false,"","INNY EKRAN",pkg);
+        if(pkg==null || pkg.trim().isEmpty() || pkg.startsWith("pl.krupapiotr."))
+            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg);
+        final boolean knownPhonePackage=isCandidate(pkg);
         boolean end=false,accept=false,reject=false,outgoing=false,ringing=false,timer=false;
         String number=""; int count=0;
         if(labels!=null) for(String original:labels) {
@@ -44,12 +46,17 @@ final class PhoneUiDetector {
             }
         }
         boolean active=end||(accept&&reject);
+        // The K706 vendor phone package is not fixed across ROM releases.
+        // Unknown packages need strong call-window evidence to avoid false positives.
+        if(!knownPhonePackage)
+            active=(end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
+                    (accept&&reject&&ringing);
         if("com.android.systemui".equalsIgnoreCase(pkg))
             active=(end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
                     (accept&&reject&&ringing);
         // Report markers, never raw numbers, in the copyable diagnostic log.
         String diagnostic=(active?"ROZMOWA WYKRYTA":"BRAK POTWIERDZONEJ ROZMOWY")+
-                " / pkg="+pkg+" / elementy="+count+" / koniec="+end+
+                " / pkg="+pkg+" / znany="+knownPhonePackage+" / elementy="+count+" / koniec="+end+
                 " / odbierz="+accept+" / odrzuc="+reject+" / czas="+timer+
                 " / numer="+(!number.isEmpty());
         return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg);
