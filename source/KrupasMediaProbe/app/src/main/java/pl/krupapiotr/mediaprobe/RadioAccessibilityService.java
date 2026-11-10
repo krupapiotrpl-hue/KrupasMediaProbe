@@ -215,6 +215,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
         lastPhoneScan=uptime;
         PhoneUiDetector.Result detected=null;
+        PhoneUiDetector.Result phoneWindowHint=null;
         int inspectedWindows=0;
         StringBuilder seenPackages=new StringBuilder();
         try {
@@ -230,6 +231,9 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 // Scan even unrecognized OEM package names. The detector requires
                 // strong call-window markers for these unknown packages.
                 PhoneUiDetector.Result result=readPhoneWindow(pkg,root,null);
+                if(result.phoneWindow && (phoneWindowHint==null ||
+                        (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
+                    phoneWindowHint=result;
                 if(result.active){detected=result;break;}
                 if(detected==null || PhoneUiDetector.isCandidate(pkg))detected=result;
             }
@@ -244,9 +248,19 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(root!=null && root.getPackageName()!=null &&
                         !pkg.equals(root.getPackageName().toString()))root=null;
                 PhoneUiDetector.Result result=readPhoneWindow(pkg,root,event);
+                if(result.phoneWindow && (phoneWindowHint==null ||
+                        (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
+                    phoneWindowHint=result;
                 if(result.active||detected==null)detected=result;
             }
         }
+        // Sparse BT UI can give caller hints even without end-call labels.
+        // Audio policy independently confirms if a real voice call is active.
+        getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
+                .putBoolean("phone_window",phoneWindowHint!=null)
+                .putLong("window_seen",System.currentTimeMillis())
+                .putString("caller_hint",phoneWindowHint==null?"":phoneWindowHint.callerHint)
+                .apply();
         if(detected!=null) {
             android.content.SharedPreferences.Editor edit=getSharedPreferences("krupas_phone_ui",MODE_PRIVATE)
                     .edit().putBoolean("active",detected.active)

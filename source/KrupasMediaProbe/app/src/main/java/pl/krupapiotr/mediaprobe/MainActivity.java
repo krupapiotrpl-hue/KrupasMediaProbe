@@ -104,6 +104,7 @@ public final class MainActivity extends Activity {
                 "MP3: "+d.getString("media_status","BRAK")+"\n"+
                 "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
                 "HFP BLUETOOTH: "+d.getString("hfp_status","BRAK") +"\n"+
+                "AUDIO ROZMOWY: "+d.getString("audio_status","BRAK") +"\n"+
                 "TELEFON OKNO K706: "+getSharedPreferences("krupas_phone_ui",0).getString("status","BRAK ODCZYTU")+"\n"+
                 "TEST TELEFONU: "+d.getString("phone_test","—")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+

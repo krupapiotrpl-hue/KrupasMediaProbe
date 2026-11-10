@@ -21,7 +21,7 @@ final class PhoneUiDetector {
 
     static Result detect(String pkg,List<String> labels) {
         if(pkg==null || pkg.trim().isEmpty() || pkg.startsWith("pl.krupapiotr."))
-            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg);
+            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg,"",false);
         final boolean knownPhonePackage=isCandidate(pkg);
         boolean end=false,accept=false,reject=false,outgoing=false,ringing=false,timer=false;
         String number=""; int count=0;
@@ -59,7 +59,9 @@ final class PhoneUiDetector {
                 " / pkg="+pkg+" / znany="+knownPhonePackage+" / elementy="+count+" / koniec="+end+
                 " / odbierz="+accept+" / odrzuc="+reject+" / czas="+timer+
                 " / numer="+(!number.isEmpty());
-        return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg);
+        return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg,
+                (knownPhonePackage || active) ? number : "",
+                knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg));
     }
 
     private static boolean any(String s,String... parts) {
@@ -67,9 +69,11 @@ final class PhoneUiDetector {
         return false;
     }
     static final class Result {
-        final boolean active; final String display,diagnostic,pkg;
-        Result(boolean active,String display,String diagnostic,String pkg) {
+        final boolean active, phoneWindow;
+        final String display,diagnostic,pkg,callerHint;
+        Result(boolean active,String display,String diagnostic,String pkg,String callerHint,boolean phoneWindow) {
             this.active=active;this.display=display;this.diagnostic=diagnostic;this.pkg=pkg;
+            this.callerHint=callerHint;this.phoneWindow=phoneWindow;
         }
     }
 }

@@ -32,6 +32,9 @@ public final class MediaBridgeService extends Service {
     private BleDisplayClient ble;
     private PhoneCallMonitor phone;
     private HfpCallMonitor hfp;
+    private CallAudioMonitor callAudio;
+    private int audioCallHits,audioCallMisses;
+    private boolean audioCallHeld;
     private boolean phoneDisplayed;
     private String lastPhoneText="";
     private long lastPhoneSent;
@@ -60,6 +63,7 @@ public final class MediaBridgeService extends Service {
         phone.start();
         hfp=new HfpCallMonitor(this);
         hfp.start();
+        callAudio=new CallAudioMonitor(this);
         registerMusicReceiver();
         h.post(loop);
     }
@@ -194,15 +198,39 @@ public final class MediaBridgeService extends Service {
         long uiSeen=phoneUi.getLong("seen",0);
         boolean uiCall=!hfpActive && !localCall && phoneUi.getBoolean("active",false)
                 && uiSeen>0 && now>=uiSeen && now-uiSeen<=8000;
-        if(hfpActive || localCall || uiCall) testPhoneUntil=0;
-        boolean testCall = !hfpActive && !localCall && !uiCall && now<testPhoneUntil;
-        if(hfpActive || localCall || uiCall || testCall) {
+        long windowSeen=phoneUi.getLong("window_seen",0);
+        boolean phoneWindow=phoneUi.getBoolean("phone_window",false) &&
+                windowSeen>0 && now>=windowSeen && now-windowSeen<=7000;
+        CallAudioMonitor.Snapshot audio=callAudio==null?null:callAudio.snapshot();
+        boolean audioCandidate=audio!=null && CallAudioRules.likelyCall(
+                audio.mode,audio.sco,audio.voicePlayback,phoneWindow);
+        // Two consecutive audio samples avoid transient BT/assistant activity.
+        if(audioCandidate) {
+            audioCallHits=Math.min(3,audioCallHits+1);
+            audioCallMisses=0;
+            if(audioCallHits>=2)audioCallHeld=true;
+        } else {
+            audioCallHits=0;
+            audioCallMisses=Math.min(3,audioCallMisses+1);
+            if(audioCallMisses>=2)audioCallHeld=false;
+        }
+        boolean audioCall=!hfpActive && !localCall && !uiCall && audioCallHeld;
+        diag("audio_status",(audio==null?"NIEDOSTEPNE":audio.status()) +
+                " / oknoBT="+phoneWindow+" / probka="+audioCandidate+
+                " / wykryto="+audioCallHeld);
+        if(hfpActive || localCall || uiCall || audioCall) testPhoneUntil=0;
+        boolean testCall = !hfpActive && !localCall && !uiCall && !audioCall && now<testPhoneUntil;
+        if(hfpActive || localCall || uiCall || audioCall || testCall) {
+            String audioCaller=SourceRouter.clean(phoneUi.getString("caller_hint",""));
+            if(!phoneWindow || audioCaller.isEmpty())audioCaller="ROZMOWA";
             String caller = hfpActive ? hfp.display() :
                     (localCall ? phone.display() :
-                    (uiCall ? phoneUi.getString("display","ROZMOWA") : "TEST TELEFONU"));
+                    (uiCall ? phoneUi.getString("display","ROZMOWA") :
+                    (audioCall ? audioCaller : "TEST TELEFONU")));
             diag("route", testCall ? "TELEFON / TEST" :
-                    (uiCall ? "TELEFON / OKNO K706" : "TELEFON / " +
-                    (hfpActive ? hfp.status() : phone.status())));
+                    (uiCall ? "TELEFON / OKNO K706" :
+                    (audioCall ? "TELEFON / AUDIO BT" : "TELEFON / " +
+                    (hfpActive ? hfp.status() : phone.status()))));
             if(ble.ready() && (!phoneDisplayed || !caller.equals(lastPhoneText) || now-lastPhoneSent>=10000)) {
                 ble.send("PHONE:" + caller); // ESP owns the fixed T| prefix
                 lastPhoneText=caller;
