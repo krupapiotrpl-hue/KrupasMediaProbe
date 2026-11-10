@@ -215,6 +215,8 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
         lastPhoneScan=uptime;
         PhoneUiDetector.Result detected=null;
+        int inspectedWindows=0;
+        StringBuilder seenPackages=new StringBuilder();
         try {
             List<AccessibilityWindowInfo> windows=getWindows();
             if(windows!=null)for(AccessibilityWindowInfo window:windows) {
@@ -222,10 +224,14 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 AccessibilityNodeInfo root=window.getRoot();
                 if(root==null || root.getPackageName()==null)continue;
                 String pkg=root.getPackageName().toString();
-                if(!PhoneUiDetector.isCandidate(pkg))continue;
+                if(pkg.startsWith("pl.krupapiotr."))continue;
+                inspectedWindows++;
+                if(seenPackages.length()<160) seenPackages.append(pkg).append(" ");
+                // Scan even unrecognized OEM package names. The detector requires
+                // strong call-window markers for these unknown packages.
                 PhoneUiDetector.Result result=readPhoneWindow(pkg,root,null);
                 if(result.active){detected=result;break;}
-                if(detected==null)detected=result;
+                if(detected==null || PhoneUiDetector.isCandidate(pkg))detected=result;
             }
         } catch(Exception ex) {
             getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
@@ -233,7 +239,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
         }
         if(event!=null && event.getPackageName()!=null) {
             String pkg=event.getPackageName().toString();
-            if(PhoneUiDetector.isCandidate(pkg) && (detected==null||!detected.active)) {
+            if(!pkg.startsWith("pl.krupapiotr.") && (detected==null||!detected.active)) {
                 AccessibilityNodeInfo root=getRootInActiveWindow();
                 if(root!=null && root.getPackageName()!=null &&
                         !pkg.equals(root.getPackageName().toString()))root=null;
@@ -250,8 +256,14 @@ public final class RadioAccessibilityService extends AccessibilityService {
             if(detected.active)edit.putString("display",detected.display);
             else edit.remove("display");
             edit.apply();
+        } else {
+            getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
+                    .putBoolean("active",false).remove("display")
+                    .putString("status","BRAK OKNA ROZMOWY / okna="+inspectedWindows+
+                            " / pakiety="+seenPackages.toString().trim())
+                    .putLong("seen",System.currentTimeMillis()).apply();
         }
-        // No visible phone window: the bridge expires the observation after 8 seconds.
+        // Phone status is independent from media-session status.
     }
 
     private PhoneUiDetector.Result readPhoneWindow(String pkg,
