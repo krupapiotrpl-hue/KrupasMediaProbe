@@ -7,12 +7,19 @@ import android.service.notification.StatusBarNotification;
 
 public class MediaProbeNotificationService extends NotificationListenerService {
     private static volatile MediaProbeNotificationService connected;
+    static boolean isConnected() { return connected != null; }
     @Override public void onListenerConnected() {
         super.onListenerConnected();
         connected=this;
+        AccessHealth.event(this, "NOTIFICATION_CONNECTED");
         BootReceiver.startBridge(this, "NOTIFICATION_LISTENER_CONNECTED");
     }
-    @Override public void onListenerDisconnected() { connected=null; }
+    @Override public void onListenerDisconnected() {
+        connected=null;
+        AccessHealth.event(this, "NOTIFICATION_DISCONNECTED");
+        AccessHealth.recoverNotificationListener(this);
+        super.onListenerDisconnected();
+    }
     @Override public void onDestroy() { if(connected==this)connected=null;super.onDestroy(); }
 
     static MediaBridgeService.MediaResult activeRadio(android.content.Context context) {
@@ -116,4 +123,5 @@ public class MediaProbeNotificationService extends NotificationListenerService {
         return s == null ? "" : s.toString();
     }
 }
+
 

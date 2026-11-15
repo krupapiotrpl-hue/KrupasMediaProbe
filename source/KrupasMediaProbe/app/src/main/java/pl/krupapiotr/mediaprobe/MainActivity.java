@@ -95,8 +95,7 @@ public final class MainActivity extends Activity {
         if(status==null)return;
         android.content.SharedPreferences d=getSharedPreferences("krupas_diag",0);
         android.content.SharedPreferences r=getSharedPreferences("krupas_radio",0);
-        String notificationListeners=Settings.Secure.getString(getContentResolver(),"enabled_notification_listeners");
-        String accessibility=Settings.Secure.getString(getContentResolver(),"enabled_accessibility_services");
+
         status.setText("WERSJA: "+getAppVersion()+" / pl.krupapiotr.mediaprobe\n"+
                 "BLE: "+d.getString("ble","BRAK")+"\n"+
                 "OSTATNIA TRANSMISJA: "+d.getString("last_tx","BRAK")+"\n"+
@@ -110,8 +109,10 @@ public final class MainActivity extends Activity {
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "DAB+: "+d.getString("dab_status","BRAK")+"\n"+
                 "RDS DYNAMICZNY: "+d.getString("rds_status","BRAK")+"\n"+
-                "NOTYFIKACJE: "+(notificationListeners!=null&&notificationListeners.contains(getPackageName())?"OK":"BRAK UPRAWNIEŃ")+"\n"+
-                "DOSTĘPNOŚĆ RADIO: "+(accessibility!=null&&accessibility.contains(getPackageName()+"/"+RadioAccessibilityService.class.getName())?"OK":"SPRAWDŹ")+"\n\n"+
+                AccessHealth.summary(this)+"\n"+
+                "AUTOSTART: "+d.getString("autostart","BRAK")+"\n"+
+                "HISTORIA DOSTĘPU (czas UTC ms / uptime ms):\n"+
+                getSharedPreferences("krupas_access_health",0).getString("events", "brak")+"\n"+
                 "OSTATNI EKRAN FM: "+r.getString("nodes","brak")+"\n\n"+
                 "OSTATNIE MP3 Z POWIADOMIENIA: "+getSharedPreferences("krupas_mp3_notification",0).getString("title","brak")+"\n"+
                 "MP3 Z WIDOKU: "+getSharedPreferences("krupas_mp3_ui",0).getString("title","brak")+"\n\n"+
@@ -120,6 +121,13 @@ public final class MainActivity extends Activity {
                 "DIAG SESJI: "+d.getString("session_error","—")+"\n"+
                 "BŁĄD: "+d.getString("error","—"));
     }
+    @Override protected void onResume() {
+        super.onResume();
+        startBridge(null);
+        AccessHealth.summary(this);
+        AccessHealth.recoverNotificationListener(this);
+    }
     @Override protected void onDestroy(){h.removeCallbacks(tick);super.onDestroy();}
 }
+
 

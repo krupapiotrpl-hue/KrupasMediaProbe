@@ -19,6 +19,16 @@ public final class RadioAccessibilityService extends AccessibilityService {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastScan;
     private boolean connected;
+    private static volatile boolean serviceConnected;
+    private static volatile long lastSample;
+    private static volatile String sampleError = "";
+    static boolean isConnected() { return serviceConnected; }
+    static String sampleStatus() {
+        if (!serviceConnected) return "USŁUGA NIEPOŁĄCZONA";
+        String age = lastSample == 0 ? "OCZEKIWANIE" :
+                (android.os.SystemClock.elapsedRealtime() - lastSample) + " ms temu";
+        return age + (sampleError.isEmpty() ? "" : " / BŁĄD: " + sampleError);
+    }
     private long lastStartRequest;
     private long lastPhoneScan;
     private final Runnable sampler = new Runnable() {
@@ -33,7 +43,14 @@ public final class RadioAccessibilityService extends AccessibilityService {
                     }
                 }
                 scanPhoneWindows(null);
-            } catch (Exception ignored) {}
+                lastSample = android.os.SystemClock.elapsedRealtime();
+                sampleError = "";
+            } catch (Exception error) {
+                String message = error.getClass().getSimpleName();
+                if (!message.equals(sampleError)) AccessHealth.event(
+                        RadioAccessibilityService.this, "READ_ERROR " + message);
+                sampleError = message;
+            }
             handler.postDelayed(this, 2000);
         }
     };
@@ -41,6 +58,10 @@ public final class RadioAccessibilityService extends AccessibilityService {
     @Override protected void onServiceConnected() {
         super.onServiceConnected();
         connected = true;
+        serviceConnected = true;
+        lastSample = 0;
+        sampleError = "";
+        AccessHealth.event(this, "ACCESSIBILITY_CONNECTED");
         BootReceiver.startBridge(this, "ACCESSIBILITY_CONNECTED");
         lastStartRequest = android.os.SystemClock.elapsedRealtime();
         handler.removeCallbacks(sampler);
@@ -311,10 +332,22 @@ public final class RadioAccessibilityService extends AccessibilityService {
         if (!s.isEmpty() && !out.contains(s) && out.size() < 80) out.add(s);
     }
 
-    @Override public void onInterrupt() {}
+    @Override public void onInterrupt() {
+        AccessHealth.event(this, "ACCESSIBILITY_INTERRUPTED");
+    }
+    @Override public boolean onUnbind(android.content.Intent intent) {
+        connected = false;
+        serviceConnected = false;
+        handler.removeCallbacks(sampler);
+        AccessHealth.event(this, "ACCESSIBILITY_UNBOUND");
+        return super.onUnbind(intent);
+    }
     @Override public void onDestroy() {
         connected = false;
+        serviceConnected = false;
         handler.removeCallbacks(sampler);
+        AccessHealth.event(this, "ACCESSIBILITY_DESTROYED");
         super.onDestroy();
     }
 }
+

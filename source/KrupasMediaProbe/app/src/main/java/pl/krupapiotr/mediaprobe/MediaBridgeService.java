@@ -30,6 +30,16 @@ public final class MediaBridgeService extends Service {
     static final String ACTION_TEST_PHONE="pl.krupapiotr.mediaprobe.TEST_PHONE";
     private final Handler h=new Handler(Looper.getMainLooper());
     private BleDisplayClient ble;
+    private final SourceAnnouncement sourceAnnouncement = new SourceAnnouncement();
+    private boolean wakeRegistered;
+    private final BroadcastReceiver wakeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            AccessHealth.event(context, "WAKE " + intent.getAction());
+            AccessHealth.recoverNotificationListener(context);
+            h.removeCallbacks(loop);
+            h.post(loop);
+        }
+    };
     private PhoneCallMonitor phone;
     private HfpCallMonitor hfp;
     private CallAudioMonitor callAudio;
@@ -55,6 +65,7 @@ public final class MediaBridgeService extends Service {
         foreground();
         ble=new BleDisplayClient(this,()->{
             oldMedia="";oldMediaSource="";oldFreq="";oldStation="";oldDab="";sentMedia=sentRadio=sentStation=sentDab=0;
+            sourceAnnouncement.reset();
             phoneDisplayed=false;lastPhoneSent=0;lastPhoneText="";
             diag("connect",""+System.currentTimeMillis());
         });
@@ -65,6 +76,14 @@ public final class MediaBridgeService extends Service {
         hfp.start();
         callAudio=new CallAudioMonitor(this);
         registerMusicReceiver();
+        IntentFilter wake = new IntentFilter();
+        wake.addAction(Intent.ACTION_SCREEN_ON);
+        wake.addAction(Intent.ACTION_USER_PRESENT);
+        wake.addAction(android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(wakeReceiver, wake, Context.RECEIVER_EXPORTED);
+        else registerReceiver(wakeReceiver, wake);
+        wakeRegistered = true;
+        AccessHealth.event(this, "BRIDGE_CREATED");
         h.post(loop);
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
@@ -83,6 +102,7 @@ public final class MediaBridgeService extends Service {
     @Override public void onDestroy(){
         h.removeCallbacks(loop);
         if(registered)unregisterReceiver(musicReceiver);
+        if(wakeRegistered)unregisterReceiver(wakeReceiver);
         if(phone!=null)phone.stop();
         if(hfp!=null)hfp.stop();
         if(ble!=null)ble.stop();
@@ -112,6 +132,8 @@ public final class MediaBridgeService extends Service {
     private void refresh(){
         if (ble == null) return;
         ble.watchdog();
+        AccessHealth.summary(this);
+        AccessHealth.recoverNotificationListener(this);
         final long now = System.currentTimeMillis();
         final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
         final String freq = SourceRouter.clean(radio.getString("freq", ""));
@@ -171,7 +193,8 @@ public final class MediaBridgeService extends Service {
         // An actually PLAYING media session is more reliable than a remembered
         // FM label. Visible live radio wins over legacy/notification fallbacks.
         boolean playingSession = "PLAYING".equals(media.state) && !media.radio;
-        boolean preferDab = media.dab && !media.title.isEmpty();
+        boolean preferDab = MediaRoutePolicy.preferDab(media.dab, !media.title.isEmpty(),
+                media.state, radioLive, radioVisible);
         boolean preferRadio = !preferDab && radioLive && !playingSession;
         // When NavRadio+ provides a custom station label and live RDS, show
         // the label for five seconds and the RDS text for five seconds.
@@ -244,6 +267,7 @@ public final class MediaBridgeService extends Service {
             phoneDisplayed=false;
             lastPhoneSent=0;
             lastPhoneText="";
+            sourceAnnouncement.reset();
             oldMedia=oldMediaSource=oldFreq=oldStation=oldDab="";
             sentMedia=sentRadio=sentStation=sentDab=0;
         }
@@ -257,9 +281,21 @@ public final class MediaBridgeService extends Service {
         // Prepare the native D| protocol now; default to TITLE: for current ESP 1.9x17.
         // Switching the UI toggle later enables DAB:TEXT without another Android update.
         if (!preferDab && !oldDab.isEmpty()) {
-            ble.send(nativeDab ? "DAB:STOP" : "MEDIA:STOP");
+            ble.send("DAB:STOP");
+            ble.send("MEDIA:STOP");
             oldDab=""; sentDab=0;
             oldMedia=""; oldMediaSource=""; sentMedia=0;
+        }
+        String outgoingSource = preferDab ? (nativeDab ? "DAB" : "MP3") :
+                preferRadio ? "FM" : !media.title.isEmpty() ?
+                (SourceRouter.isYouTubePackage(media.pkg) ? "YT" : "MP3") : "OFF";
+        java.util.List<String> sourceCommands = sourceAnnouncement.commands(
+                outgoingSource, SystemClock.elapsedRealtime());
+        for (String command : sourceCommands) ble.send(command);
+        // CLEAR:ALL invalidates ESP caches, so resend all active metadata too.
+        if (sourceCommands.contains("CLEAR:ALL")) {
+            oldMedia=oldMediaSource=oldFreq=oldStation=oldDab="";
+            sentMedia=sentRadio=sentStation=sentDab=0;
         }
         if (preferDab) {
             if (!oldFreq.isEmpty() || !oldStation.isEmpty()) {
@@ -461,4 +497,5 @@ public final class MediaBridgeService extends Service {
         }catch(Exception e){diag("receiver_error",e.toString());}
     }
 }
+
 
