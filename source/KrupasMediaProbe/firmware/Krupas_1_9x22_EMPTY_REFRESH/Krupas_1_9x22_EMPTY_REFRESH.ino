@@ -2422,9 +2422,9 @@ bool extractMediaBarPrefix(String &text, MediaSource &source) {
 // station names, RDS announcements and music titles.
 // Applied ONLY to FM/RDS, never to MP3/YouTube/DAB/telephone metadata.
 String cleanRdsSeparators(String input) {
-  input.replace("\\r", " ");
-  input.replace("\\n", " ");
-  input.replace("\\t", " ");
+  input.replace("\r", " ");
+  input.replace("\n", " ");
+  input.replace("\t", " ");
   input.replace("\xE2\x80\x93", "-"); // UTF-8 en dash
   input.replace("\xE2\x80\x94", "-"); // UTF-8 em dash
   input.trim();
