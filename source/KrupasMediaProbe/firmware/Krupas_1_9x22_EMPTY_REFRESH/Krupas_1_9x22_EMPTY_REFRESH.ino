@@ -2416,6 +2416,50 @@ bool extractMediaBarPrefix(String &text, MediaSource &source) {
   return true;
 }
 
+
+// 1.9x23 RDS DASH GUARD.
+// Remove empty OEM metadata separators but preserve separators inside actual
+// station names, RDS announcements and music titles.
+// Applied ONLY to FM/RDS, never to MP3/YouTube/DAB/telephone metadata.
+String cleanRdsSeparators(String input) {
+  input.replace("\\r", " ");
+  input.replace("\\n", " ");
+  input.replace("\\t", " ");
+  input.replace("\xE2\x80\x93", "-"); // UTF-8 en dash
+  input.replace("\xE2\x80\x94", "-"); // UTF-8 em dash
+  input.trim();
+
+  // Trim leading/trailing runs of separators: "- -", "--", "| -", etc.
+  // Do not touch inner "ARTIST - TITLE" or "RADIO - NEWS" separators.
+  bool changed = true;
+  while (changed && input.length()) {
+    changed = false;
+    input.trim();
+    while (input.length() && (input[0] == '-' || input[0] == '|')) {
+      input.remove(0, 1);
+      input.trim();
+      changed = true;
+    }
+    while (input.length() &&
+           (input[input.length()-1] == '-' || input[input.length()-1] == '|')) {
+      input.remove(input.length()-1);
+      input.trim();
+      changed = true;
+    }
+  }
+
+  // A lone dash-separated group is never RDS data.
+  String check = input;
+  check.replace(" ", "");
+  check.replace("-", "");
+  check.replace("|", "");
+  if (check.length() == 0) return "";
+
+  // Normalize whitespace left after stripping decorative separators.
+  while (input.indexOf("  ") >= 0) input.replace("  ", " ");
+  return input;
+}
+
 void parseMediaText(const String &raw, MediaSource &source, String &title) {
   title = raw;
   title.replace("\r", " ");
@@ -2510,14 +2554,8 @@ void parseMediaText(const String &raw, MediaSource &source, String &title) {
     }
   }
 
-  // Nie pozostawiaj koncowych artefaktow metadanych " | -".
-  while (title.endsWith(" | -") || title.endsWith(" |") ||
-         title.endsWith(" | --")) {
-    if (title.endsWith(" | --")) title.remove(title.length() - 5);
-    else if (title.endsWith(" | -")) title.remove(title.length() - 4);
-    else title.remove(title.length() - 2);
-    title.trim();
-  }
+  // Guard FM/RDS only; MP3, DAB, YT and phone title formatting unchanged.
+  if (source == MEDIA_RADIO) title = cleanRdsSeparators(title);
 }
 
 void loadTitle(const String &raw) {
@@ -2584,10 +2622,9 @@ void redrawActiveSource() {
     (selectedSource == MEDIA_UNKNOWN &&
      (radioRds.length() || radioFrequency.length()))) {
 
-  String rds = radioRds;
+  String rds = cleanRdsSeparators(radioRds);
   String freq = radioFrequency;
 
-  rds.trim();
   freq.trim();
 
   String rdsCheck = rds;
@@ -2727,7 +2764,7 @@ void handleBleMessage(String message) {
     return;
   }
   if (upper.startsWith("RDS:")) {
-    radioRds = message.substring(4); radioRds.trim();
+    radioRds = cleanRdsSeparators(message.substring(4));
     if (!callActive && (selectedSource == MEDIA_UNKNOWN || selectedSource == MEDIA_RADIO)) {
       selectedSource = MEDIA_RADIO;
       redrawActiveSource();
@@ -2751,7 +2788,7 @@ void handleBleMessage(String message) {
     if (inferred == MEDIA_DAB) {
       dabText = normalized; selectedSource = MEDIA_DAB;
     } else if (inferred == MEDIA_RADIO) {
-      radioRds = normalized;
+      radioRds = cleanRdsSeparators(normalized);
       selectedSource = MEDIA_RADIO;
     } else if (inferred == MEDIA_PHONE) {
       callText = normalized; callActive = true;
@@ -2775,7 +2812,7 @@ void handleBleMessage(String message) {
     if (inferred == MEDIA_DAB) {
       dabText = normalized; selectedSource = MEDIA_DAB;
     } else if (inferred == MEDIA_RADIO) {
-      radioRds = normalized; selectedSource = MEDIA_RADIO;
+      radioRds = cleanRdsSeparators(normalized); selectedSource = MEDIA_RADIO;
     } else if (inferred == MEDIA_PHONE) {
       callText = normalized; callActive = true;
     } else {
