@@ -18,6 +18,16 @@ final class SourceRouter {
         return s.length() > 90 ? s.substring(0, 90) : s;
     }
 
+    /** Hide empty/dangling OEM RDS separators, without changing media titles. */
+    static String cleanRds(String value) {
+        String s=clean(value);
+        if(s.matches("[\\s–—-]+"))return "";
+        s=s.replaceAll("^(?:--+|––+|——+)\\s*","")
+                .replaceAll("\\s*(?:--+|––+|——+)$","")
+                .replaceAll("\\s+[-–—]$","").trim();
+        return s;
+    }
+
     static boolean isPlaceholder(String value) {
         if (value == null) return false;
         String s = value.replaceAll("[\\p{Cf}\\p{Z}\\s]", "").trim();

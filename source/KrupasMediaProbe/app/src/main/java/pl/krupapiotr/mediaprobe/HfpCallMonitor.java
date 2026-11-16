@@ -32,6 +32,7 @@ final class HfpCallMonitor {
     private boolean outgoing;
     private String number = "";
     private long updated;
+    private long endedAt;
 
     HfpCallMonitor(Context ctx) { context = ctx.getApplicationContext(); }
 
@@ -40,6 +41,7 @@ final class HfpCallMonitor {
             if (i == null) return;
             if (CONNECTION_CHANGED.equals(i.getAction())) {
                 if (i.getIntExtra(EXTRA_STATE, -1) == 0) {
+                    if(observed&&callState<7)endedAt=System.currentTimeMillis();
                     observed = false;
                     callState = 7;
                     number = "";
@@ -59,6 +61,7 @@ final class HfpCallMonitor {
                 String n = value == null ? "" : String.valueOf(value).trim();
 
                 if (state == 7) {
+                    if(observed&&callState<7)endedAt=System.currentTimeMillis();
                     observed = false;
                     callState = 7;
                     number = "";
@@ -116,6 +119,8 @@ final class HfpCallMonitor {
         return observed && callState < 7 && updated > 0 &&
                 System.currentTimeMillis() - updated < 2L * 60 * 60 * 1000;
     }
+
+    long endedAt(){return endedAt;}
 
     String status() {
         if (!active()) return "HFP: brak aktywnej rozmowy";

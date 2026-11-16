@@ -43,8 +43,7 @@ public final class MediaBridgeService extends Service {
     private PhoneCallMonitor phone;
     private HfpCallMonitor hfp;
     private CallAudioMonitor callAudio;
-    private int audioCallHits,audioCallMisses;
-    private boolean audioCallHeld;
+    private final CallStatusTracker callTracker = new CallStatusTracker();
     private boolean phoneDisplayed;
     private String lastPhoneText="";
     private long lastPhoneSent;
@@ -137,8 +136,8 @@ public final class MediaBridgeService extends Service {
         final long now = System.currentTimeMillis();
         final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
         final String freq = SourceRouter.clean(radio.getString("freq", ""));
-        String station = SourceRouter.clean(radio.getString("station", ""));
-        final String screenRds = SourceRouter.clean(radio.getString("rds", ""));
+        String station = SourceRouter.cleanRds(radio.getString("station", ""));
+        final String screenRds = SourceRouter.cleanRds(radio.getString("rds", ""));
         final long rdsSeen = radio.getLong("rds_seen", 0);
         final long radioSeen = radio.getLong("seen", 0);
         final boolean radioVisible = radio.getBoolean("visible", false);
@@ -213,57 +212,60 @@ public final class MediaBridgeService extends Service {
                 preferRadio ? "RADIO / " + media.state :
                 !media.title.isEmpty() ? (SourceRouter.isYouTubePackage(media.pkg) ? "YOUTUBE" : "MP3 / MEDIA") : "BRAK AKTYWNEGO ZRODLA");
 
-        // HFP calls from a paired phone take priority over local TelephonyManager.
-        // Never change the existing DAB, FM, MP3, YouTube or MP4 media routing.
-        boolean hfpActive = hfp!=null && hfp.active();
-        boolean localCall = !hfpActive && phone!=null && phone.isActive();
-        SharedPreferences phoneUi=getSharedPreferences("krupas_phone_ui",0);
-        long uiSeen=phoneUi.getLong("seen",0);
-        boolean uiCall=!hfpActive && !localCall && phoneUi.getBoolean("active",false)
-                && uiSeen>0 && now>=uiSeen && now-uiSeen<=8000;
-        long windowSeen=phoneUi.getLong("window_seen",0);
-        boolean phoneWindow=phoneUi.getBoolean("phone_window",false) &&
+        // Missing OEM Bluetooth window is not evidence of a hangup.
+        boolean hfpActive = hfp != null && hfp.active();
+        boolean localCall = phone != null && phone.isActive();
+        SharedPreferences phoneUi = getSharedPreferences("krupas_phone_ui",0);
+        long uiSeen = phoneUi.getLong("seen",0);
+        long positiveSeen = phoneUi.getLong("active_positive_seen",0);
+        boolean uiCall = (phoneUi.getBoolean("active",false) &&
+                uiSeen>0 && now>=uiSeen && now-uiSeen<=8000) ||
+                (positiveSeen>0 && now>=positiveSeen && now-positiveSeen<=7000);
+        long windowSeen = phoneUi.getLong("window_seen",0);
+        boolean phoneWindow = phoneUi.getBoolean("phone_window",false) &&
                 windowSeen>0 && now>=windowSeen && now-windowSeen<=7000;
-        CallAudioMonitor.Snapshot audio=callAudio==null?null:callAudio.snapshot();
-        boolean audioCandidate=audio!=null && CallAudioRules.likelyCall(
+        long hintSeen = phoneUi.getLong("caller_positive_seen",0);
+        boolean callerEvidence = hintSeen>0 && now>=hintSeen && now-hintSeen<=7000;
+        CallAudioMonitor.Snapshot audio = callAudio==null?null:callAudio.snapshot();
+        boolean audioCandidate = audio!=null && CallAudioRules.likelyCall(
                 audio.mode,audio.sco,audio.voicePlayback,phoneWindow);
-        // Two consecutive audio samples avoid transient BT/assistant activity.
-        if(audioCandidate) {
-            audioCallHits=Math.min(3,audioCallHits+1);
-            audioCallMisses=0;
-            if(audioCallHits>=2)audioCallHeld=true;
-        } else {
-            audioCallHits=0;
-            audioCallMisses=Math.min(3,audioCallMisses+1);
-            if(audioCallMisses>=2)audioCallHeld=false;
-        }
-        boolean audioCall=!hfpActive && !localCall && !uiCall && audioCallHeld;
-        diag("audio_status",(audio==null?"NIEDOSTEPNE":audio.status()) +
+        boolean callConfirmed = hfpActive || localCall || uiCall || audioCandidate || callerEvidence;
+        // End signals are explicit: HFP TERMINATED, telephony IDLE transition or UI ended.
+        long endAt = Math.max(phoneUi.getLong("ended_seen",0),
+                Math.max(hfp==null?0:hfp.endedAt(),phone==null?0:phone.endedAt()));
+        boolean ongoingCall = callTracker.update(now,callConfirmed,endAt);
+        String evidence = hfpActive ? "HFP" : localCall ? "TELEFONIA" :
+                uiCall ? "OKNO ROZMOWY" : audioCandidate ? "AUDIO BT" :
+                callerEvidence ? "OKNO BT + NUMER" : "BRAK";
+        diag("audio_status",(audio==null?"NIEDOSTEPNE":audio.status())+
                 " / oknoBT="+phoneWindow+" / probka="+audioCandidate+
-                " / wykryto="+audioCallHeld);
-        if(hfpActive || localCall || uiCall || audioCall) testPhoneUntil=0;
-        boolean testCall = !hfpActive && !localCall && !uiCall && !audioCall && now<testPhoneUntil;
-        if(hfpActive || localCall || uiCall || audioCall || testCall) {
-            String audioCaller=SourceRouter.clean(phoneUi.getString("caller_hint",""));
-            if(!phoneWindow || audioCaller.isEmpty())audioCaller="ROZMOWA";
-            String caller = hfpActive ? hfp.display() :
-                    (localCall ? phone.display() :
-                    (uiCall ? phoneUi.getString("display","ROZMOWA") :
-                    (audioCall ? audioCaller : "TEST TELEFONU")));
-            diag("route", testCall ? "TELEFON / TEST" :
-                    (uiCall ? "TELEFON / OKNO K706" :
-                    (audioCall ? "TELEFON / AUDIO BT" : "TELEFON / " +
-                    (hfpActive ? hfp.status() : phone.status()))));
-            if(ble.ready() && (!phoneDisplayed || !caller.equals(lastPhoneText) || now-lastPhoneSent>=10000)) {
-                ble.send("PHONE:" + caller); // ESP owns the fixed T| prefix
+                " / rozmowa="+ongoingCall);
+        diag("call_decision","ROZMOWA="+ongoingCall+
+                " / zrodlo="+evidence+" / oknoBT="+phoneWindow+
+                " / BLE="+ble.ready()+
+                " / "+callTracker.reason()+
+                (ongoingCall ? " / ostatnie potwierdzenie "+(now-callTracker.lastEvidenceAt())+"ms temu":""));
+        if(ongoingCall)testPhoneUntil=0;
+        boolean testCall=!ongoingCall && now<testPhoneUntil;
+        if(ongoingCall||testCall){
+            String caller=hfpActive?hfp.display():localCall?phone.display():
+                    uiCall?SourceRouter.clean(phoneUi.getString("display","ROZMOWA")):
+                    callerEvidence?SourceRouter.clean(phoneUi.getString("caller_hint","")):
+                    ongoingCall?SourceRouter.clean(lastPhoneText):"TEST TELEFONU";
+            if(caller.isEmpty())caller="ROZMOWA";
+            diag("route",testCall?"TELEFON / TEST":
+                    "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
+            if(ble.ready()&&(!phoneDisplayed||!caller.equals(lastPhoneText)||
+                    now-lastPhoneSent>=10000)){
+                ble.send("PHONE:"+caller);
                 lastPhoneText=caller;
                 phoneDisplayed=true;
                 lastPhoneSent=now;
             }
             return;
         }
-        if(phoneDisplayed) {
-            if(ble.ready()) ble.send("PHONE:OFF");
+        if(phoneDisplayed){
+            if(ble.ready())ble.send("PHONE:OFF");
             phoneDisplayed=false;
             lastPhoneSent=0;
             lastPhoneText="";

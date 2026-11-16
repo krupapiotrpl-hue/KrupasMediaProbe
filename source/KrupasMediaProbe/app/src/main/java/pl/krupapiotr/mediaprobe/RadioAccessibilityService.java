@@ -277,8 +277,11 @@ public final class RadioAccessibilityService extends AccessibilityService {
         }
         // Sparse BT UI can give caller hints even without end-call labels.
         // Audio policy independently confirms if a real voice call is active.
-        getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
-                .putBoolean("phone_window",phoneWindowHint!=null)
+        android.content.SharedPreferences.Editor phoneHints=
+                getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit();
+        if(phoneWindowHint!=null&&!phoneWindowHint.callerHint.isEmpty())
+            phoneHints.putLong("caller_positive_seen",System.currentTimeMillis());
+        phoneHints.putBoolean("phone_window",phoneWindowHint!=null)
                 .putLong("window_seen",System.currentTimeMillis())
                 .putString("caller_hint",phoneWindowHint==null?"":phoneWindowHint.callerHint)
                 .apply();
@@ -288,8 +291,11 @@ public final class RadioAccessibilityService extends AccessibilityService {
                     .putString("pkg",detected.pkg)
                     .putString("status",detected.diagnostic)
                     .putLong("seen",System.currentTimeMillis());
-            if(detected.active)edit.putString("display",detected.display);
-            else edit.remove("display");
+            if(detected.active){
+                edit.putString("display",detected.display);
+                edit.putLong("active_positive_seen",System.currentTimeMillis());
+            }else edit.remove("display");
+            if(detected.ended)edit.putLong("ended_seen",System.currentTimeMillis());
             edit.apply();
         } else {
             getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()

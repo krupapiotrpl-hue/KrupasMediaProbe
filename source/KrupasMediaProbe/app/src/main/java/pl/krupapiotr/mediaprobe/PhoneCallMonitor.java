@@ -18,6 +18,7 @@ final class PhoneCallMonitor {
     private PhoneStateListener listener;
     private volatile int state=TelephonyManager.CALL_STATE_IDLE;
     private volatile boolean authorized;
+    private volatile long endedAt;
 
     PhoneCallMonitor(Context context) {
         this.context=context.getApplicationContext();
@@ -35,6 +36,9 @@ final class PhoneCallMonitor {
         try {
             listener=new PhoneStateListener() {
                 @Override public void onCallStateChanged(int newState,String incomingNumber) {
+                    if(state!=TelephonyManager.CALL_STATE_IDLE &&
+                            newState==TelephonyManager.CALL_STATE_IDLE)
+                        endedAt=System.currentTimeMillis();
                     state=newState;
                     // Do not trust incomingNumber without the restricted call-log permission.
                     log(status());
@@ -62,6 +66,8 @@ final class PhoneCallMonitor {
         return authorized && (state==TelephonyManager.CALL_STATE_RINGING ||
                               state==TelephonyManager.CALL_STATE_OFFHOOK);
     }
+    long endedAt(){return endedAt;}
+
     String status() {
         if(!authorized)return "BRAK UPRAWNIEN";
         if(state==TelephonyManager.CALL_STATE_RINGING)return "DZWONI";

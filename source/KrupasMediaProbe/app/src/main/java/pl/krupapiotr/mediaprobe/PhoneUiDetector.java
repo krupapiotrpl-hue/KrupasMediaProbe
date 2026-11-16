@@ -21,9 +21,9 @@ final class PhoneUiDetector {
 
     static Result detect(String pkg,List<String> labels) {
         if(pkg==null || pkg.trim().isEmpty() || pkg.startsWith("pl.krupapiotr."))
-            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg,"",false);
+            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg,"",false,false);
         final boolean knownPhonePackage=isCandidate(pkg);
-        boolean end=false,accept=false,reject=false,outgoing=false,ringing=false,timer=false;
+        boolean end=false,accept=false,reject=false,outgoing=false,ringing=false,timer=false,ended=false;
         String number=""; int count=0;
         if(labels!=null) for(String original:labels) {
             if(original==null)continue;
@@ -31,6 +31,9 @@ final class PhoneUiDetector {
             if(s.isEmpty())continue;
             count++;
             String t=s.toLowerCase(Locale.ROOT);
+            if(any(t,"call ended","call disconnected","połączenie zakończone",
+                    "polaczenie zakonczone","rozłączono rozmowę","rozlaczono rozmowe",
+                    "通话结束"))ended=true;
             if(any(t,"hang up","hangup","end call","end_call","call_end",
                     "btn_end","iv_end","rozłącz","rozlacz","zakończ","zakoncz",
                     "disconnect call","terminate call","结束通话","挂断"))end=true;
@@ -45,23 +48,23 @@ final class PhoneUiDetector {
                 if(digits>=7 && digits<=15)number=s;
             }
         }
-        boolean active=end||(accept&&reject);
+        boolean active=!ended&&(end||(accept&&reject));
         // The K706 vendor phone package is not fixed across ROM releases.
         // Unknown packages need strong call-window evidence to avoid false positives.
         if(!knownPhonePackage)
-            active=(end&&(!number.isEmpty()||(timer&&(outgoing||ringing)))) ||
-                    (accept&&reject&&ringing);
+            active=!ended&&((end&&(!number.isEmpty()||(timer&&(outgoing||ringing)))) ||
+                    (accept&&reject&&ringing));
         if("com.android.systemui".equalsIgnoreCase(pkg))
-            active=(end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
-                    (accept&&reject&&ringing);
+            active=!ended&&((end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
+                    (accept&&reject&&ringing));
         // Report markers, never raw numbers, in the copyable diagnostic log.
         String diagnostic=(active?"ROZMOWA WYKRYTA":"BRAK POTWIERDZONEJ ROZMOWY")+
                 " / pkg="+pkg+" / znany="+knownPhonePackage+" / elementy="+count+" / koniec="+end+
                 " / odbierz="+accept+" / odrzuc="+reject+" / czas="+timer+
-                " / numer="+(!number.isEmpty());
+                " / numer="+(!number.isEmpty())+" / koniec="+ended;
         return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg,
                 (knownPhonePackage || active) ? number : "",
-                knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg));
+                knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg),ended);
     }
 
     private static boolean any(String s,String... parts) {
@@ -69,11 +72,12 @@ final class PhoneUiDetector {
         return false;
     }
     static final class Result {
-        final boolean active, phoneWindow;
+        final boolean active, phoneWindow, ended;
         final String display,diagnostic,pkg,callerHint;
-        Result(boolean active,String display,String diagnostic,String pkg,String callerHint,boolean phoneWindow) {
+        Result(boolean active,String display,String diagnostic,String pkg,String callerHint,
+               boolean phoneWindow,boolean ended) {
             this.active=active;this.display=display;this.diagnostic=diagnostic;this.pkg=pkg;
-            this.callerHint=callerHint;this.phoneWindow=phoneWindow;
+            this.callerHint=callerHint;this.phoneWindow=phoneWindow;this.ended=ended;
         }
     }
 }
