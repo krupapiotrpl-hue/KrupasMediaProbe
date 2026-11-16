@@ -1,0 +1,22 @@
+name: ESP32 1.9x23 RDS DASH GUARD
+on:
+  push:
+    branches: ['fix/esp-1-9x23-rds-dash-guard-20261116']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare downloadable firmware
+        run: |
+          cp source/KrupasMediaProbe/firmware/Krupas_1_9x22_EMPTY_REFRESH/Krupas_1_9x22_EMPTY_REFRESH.ino KRUPAS_ESP32_1.9x23_RDS_DASH_GUARD.ino
+          test -s KRUPAS_ESP32_1.9x23_RDS_DASH_GUARD.ino
+          sha256sum KRUPAS_ESP32_1.9x23_RDS_DASH_GUARD.ino
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KRUPAS-ESP32-1.9x23-RDS-DASH-GUARD
+          path: KRUPAS_ESP32_1.9x23_RDS_DASH_GUARD.ino
+          if-no-files-found: error
