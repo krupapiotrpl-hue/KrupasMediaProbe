@@ -45,6 +45,8 @@ public final class MediaBridgeService extends Service {
     private CallAudioMonitor callAudio;
     private final CallStatusTracker callTracker = new CallStatusTracker();
     private boolean phoneDisplayed;
+    // ESP may still show the previous T| overlay after a BLE/service restart.
+    private boolean phoneClearPending = true;
     private String lastPhoneText="";
     private long lastPhoneSent;
     private long testPhoneUntil;
@@ -66,6 +68,7 @@ public final class MediaBridgeService extends Service {
             oldMedia="";oldMediaSource="";oldFreq="";oldStation="";oldDab="";sentMedia=sentRadio=sentStation=sentDab=0;
             sourceAnnouncement.reset();
             phoneDisplayed=false;lastPhoneSent=0;lastPhoneText="";
+            phoneClearPending=true;
             diag("connect",""+System.currentTimeMillis());
         });
         ble.start();
@@ -128,6 +131,11 @@ public final class MediaBridgeService extends Service {
         startForeground(19,n);
     }
     private void diag(String k,String v){getSharedPreferences("krupas_diag",0).edit().putString(k,v).apply();}
+    private static String elapsedReadable(long millis) {
+        long seconds = Math.max(0L, millis) / 1000L;
+        return seconds < 60L ? seconds + " s" :
+                (seconds / 60L) + " min " + (seconds % 60L) + " s";
+    }
     private void refresh(){
         if (ble == null) return;
         ble.watchdog();
@@ -244,7 +252,8 @@ public final class MediaBridgeService extends Service {
                 " / zrodlo="+evidence+" / oknoBT="+phoneWindow+
                 " / BLE="+ble.ready()+
                 " / "+callTracker.reason()+
-                (ongoingCall ? " / ostatnie potwierdzenie "+(now-callTracker.lastEvidenceAt())+"ms temu":""));
+                (ongoingCall ? " / ostatnie potwierdzenie "+
+                    elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":""));
         if(ongoingCall)testPhoneUntil=0;
         boolean testCall=!ongoingCall && now<testPhoneUntil;
         if(ongoingCall||testCall){
@@ -264,8 +273,13 @@ public final class MediaBridgeService extends Service {
             }
             return;
         }
-        if(phoneDisplayed){
-            if(ble.ready())ble.send("PHONE:OFF");
+        if(phoneDisplayed || phoneClearPending){
+            // PHONE:OFF must also be sent once on each BLE reconnect. Otherwise
+            // an ESP retaining callActive=true ignores FM/MP3 test/source data.
+            if(ble.ready()){
+                ble.send("PHONE:OFF");
+                phoneClearPending=false;
+            }
             phoneDisplayed=false;
             lastPhoneSent=0;
             lastPhoneText="";
