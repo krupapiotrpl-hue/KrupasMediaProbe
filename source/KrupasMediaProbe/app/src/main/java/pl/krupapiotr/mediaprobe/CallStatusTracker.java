@@ -40,7 +40,7 @@ final class CallStatusTracker {
             final long missingMs = Math.max(0L, now - lastEvidence);
             if (missingMs >= EVIDENCE_GRACE_MS) {
                 active = false;
-                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ 15 S";
+                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ 6 S";
             } else {
                 reason = "PODTRZYMANIE - BRAK NOWEGO SYGNALU";
             }
