@@ -20,6 +20,12 @@ final class PhoneUiDetector {
     }
 
     static Result detect(String pkg,List<String> labels) {
+        return detect(pkg, labels, false);
+    }
+
+    // A floating SystemUI phone panel on K706 can contain only icon buttons:
+    // the OEM doesn't always expose its "wybiera..." text to Accessibility.
+    static Result detect(String pkg,List<String> labels,boolean floatingPhonePanel) {
         if(pkg==null || pkg.trim().isEmpty() || pkg.startsWith("pl.krupapiotr."))
             return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg,"",false,false);
         final boolean knownPhonePackage=isCandidate(pkg);
@@ -60,12 +66,13 @@ final class PhoneUiDetector {
                     // K706 presents an OEM floating outgoing-call panel in SystemUI.
                     // The observed panel exposes "wybiera..." but no hang-up label
                     // to Accessibility. Require a populated window, not a lone event.
-                    (outgoing && count>=8));
+                    outgoing || floatingPhonePanel);
         // Report markers, never raw numbers, in the copyable diagnostic log.
         String diagnostic=(active?"ROZMOWA WYKRYTA":"BRAK POTWIERDZONEJ ROZMOWY")+
                 " / pkg="+pkg+" / znany="+knownPhonePackage+" / elementy="+count+" / koniec="+end+
                 " / odbierz="+accept+" / odrzuc="+reject+" / czas="+timer+
-                " / numer="+(!number.isEmpty())+" / koniec="+ended;
+                " / numer="+(!number.isEmpty())+" / wybiera="+outgoing+
+                " / panel="+floatingPhonePanel+" / koniec="+ended;
         return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg,
                 (knownPhonePackage || active) ? number : "",
                 (knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg)) || active,ended);
