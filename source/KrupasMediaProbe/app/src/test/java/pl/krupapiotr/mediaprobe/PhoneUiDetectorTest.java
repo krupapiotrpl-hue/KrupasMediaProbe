@@ -37,6 +37,19 @@ public class PhoneUiDetectorTest {
         assertFalse(PhoneUiDetector.detect("pl.krupapiotr.mediaprobe",
                 Arrays.asList("End call","+48 501 234 567","00:31")).active);
     }
+    @Test public void k706SystemUiCallMarkersAndPanel() {
+        assertTrue(PhoneUiDetector.detect("com.android.systemui",
+                Arrays.asList("Piotr K","wybiera...")).active);
+        assertTrue(PhoneUiDetector.detect("com.android.systemui",
+                Arrays.asList("Piotr K","SystemUI","15:49"),true).active);
+        assertFalse(PhoneUiDetector.detect("com.android.systemui",
+                Arrays.asList("Piotr K","SystemUI","15:49"),false).active);
+        assertFalse(PhoneUiDetector.detect("com.google.android.youtube",
+                Arrays.asList("Playing video","15:49"),true).active);
+        assertFalse(PhoneUiDetector.detect("com.android.systemui",
+                Arrays.asList("połączenie zakończone","15:49"),true).active);
+    }
+
     @Test public void polishLabel() {
         assertTrue(PhoneUiDetector.detect("com.wits.ksw.bt",
                 Arrays.asList("Zakończ połączenie","01:20")).active);
