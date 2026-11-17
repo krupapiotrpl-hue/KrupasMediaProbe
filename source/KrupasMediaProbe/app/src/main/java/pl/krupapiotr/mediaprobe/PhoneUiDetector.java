@@ -40,7 +40,7 @@ final class PhoneUiDetector {
             if(any(t,"answer call","answer_call","accept call","accept_call",
                     "odbierz","odpowiedz","接听"))accept=true;
             if(any(t,"decline","reject call","reject_call","odrzuć","odrzuc"))reject=true;
-            if(any(t,"dialing","calling...","outgoing call","wybieranie","dzwonienie"))outgoing=true;
+            if(any(t,"dialing","calling...","outgoing call","wybieranie","wybiera","dzwonienie"))outgoing=true;
             if(any(t,"incoming call","przychodzące","przychodzace"))ringing=true;
             if(s.matches("[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?"))timer=true;
             if(number.isEmpty() && NUMBER.matcher(s).matches()) {
@@ -56,7 +56,11 @@ final class PhoneUiDetector {
                     (accept&&reject&&ringing));
         if("com.android.systemui".equalsIgnoreCase(pkg))
             active=!ended&&((end&&(timer||!number.isEmpty()||outgoing||ringing)) ||
-                    (accept&&reject&&ringing));
+                    (accept&&reject&&ringing) ||
+                    // K706 presents an OEM floating outgoing-call panel in SystemUI.
+                    // The observed panel exposes "wybiera..." but no hang-up label
+                    // to Accessibility. Require a populated window, not a lone event.
+                    (outgoing && count>=8));
         // Report markers, never raw numbers, in the copyable diagnostic log.
         String diagnostic=(active?"ROZMOWA WYKRYTA":"BRAK POTWIERDZONEJ ROZMOWY")+
                 " / pkg="+pkg+" / znany="+knownPhonePackage+" / elementy="+count+" / koniec="+end+
@@ -64,7 +68,7 @@ final class PhoneUiDetector {
                 " / numer="+(!number.isEmpty())+" / koniec="+ended;
         return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg,
                 (knownPhonePackage || active) ? number : "",
-                knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg),ended);
+                (knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg)) || active,ended);
     }
 
     private static boolean any(String s,String... parts) {
