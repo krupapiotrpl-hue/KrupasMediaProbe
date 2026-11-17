@@ -3,6 +3,8 @@ package pl.krupapiotr.mediaprobe;
 import android.accessibilityservice.AccessibilityService;
 import android.os.Handler;
 import android.os.Looper;
+import android.graphics.Rect;
+import android.util.DisplayMetrics;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -238,6 +240,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
         PhoneUiDetector.Result detected=null;
         PhoneUiDetector.Result phoneWindowHint=null;
         int inspectedWindows=0;
+        int floatingPanels=0;
         StringBuilder seenPackages=new StringBuilder();
         try {
             List<AccessibilityWindowInfo> windows=getWindows();
@@ -251,7 +254,11 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(seenPackages.length()<160) seenPackages.append(pkg).append(" ");
                 // Scan even unrecognized OEM package names. The detector requires
                 // strong call-window markers for these unknown packages.
-                PhoneUiDetector.Result result=readPhoneWindow(pkg,root,null);
+                boolean floatingPanel=looksLikeK706PhonePanel(window,pkg,root);
+                if(floatingPanel)floatingPanels++;
+                String title=(android.os.Build.VERSION.SDK_INT>=24 && window.getTitle()!=null)
+                        ? window.getTitle().toString() : "";
+                PhoneUiDetector.Result result=readPhoneWindow(pkg,root,null,title,floatingPanel);
                 if(result.phoneWindow && (phoneWindowHint==null ||
                         (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
                     phoneWindowHint=result;
@@ -268,13 +275,18 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 AccessibilityNodeInfo root=getRootInActiveWindow();
                 if(root!=null && root.getPackageName()!=null &&
                         !pkg.equals(root.getPackageName().toString()))root=null;
-                PhoneUiDetector.Result result=readPhoneWindow(pkg,root,event);
+                PhoneUiDetector.Result result=readPhoneWindow(pkg,root,event,"",false);
                 if(result.phoneWindow && (phoneWindowHint==null ||
                         (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
                     phoneWindowHint=result;
                 if(result.active||detected==null)detected=result;
             }
         }
+        getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
+                .putString("windows","okna="+inspectedWindows+
+                        " / paneleBT="+floatingPanels+
+                        " / pakiety="+seenPackages.toString().trim())
+                .apply();
         // Sparse BT UI can give caller hints even without end-call labels.
         // Audio policy independently confirms if a real voice call is active.
         android.content.SharedPreferences.Editor phoneHints=
@@ -307,9 +319,39 @@ public final class RadioAccessibilityService extends AccessibilityService {
         // Phone status is independent from media-session status.
     }
 
+    // Geometry is checked against the K706 floating three-control call panel,
+    // not the full-screen SystemUI or its narrow status bar.
+    private boolean looksLikeK706PhonePanel(AccessibilityWindowInfo window,
+            String pkg,AccessibilityNodeInfo root) {
+        if(window==null || root==null || !"com.android.systemui".equalsIgnoreCase(pkg))return false;
+        Rect b=new Rect();
+        window.getBoundsInScreen(b);
+        DisplayMetrics dm=getResources().getDisplayMetrics();
+        int w=dm.widthPixels,h=dm.heightPixels;
+        if(w<300 || h<200 || b.isEmpty())return false;
+        if(b.width()<w/4 || b.width()>w*85/100 ||
+                b.height()<h/9 || b.height()>h*65/100 ||
+                b.top<h/18 || b.bottom>h*90/100)return false;
+        int controls=0,visited=0;
+        ArrayDeque<AccessibilityNodeInfo> queue=new ArrayDeque<>();
+        queue.add(root);
+        while(!queue.isEmpty() && visited++<160) {
+            AccessibilityNodeInfo node=queue.removeFirst();
+            if(node.isClickable() && node.isEnabled() && node.isVisibleToUser())controls++;
+            for(int i=0;i<node.getChildCount();i++) {
+                AccessibilityNodeInfo child=node.getChild(i);
+                if(child!=null)queue.add(child);
+            }
+        }
+        // Three buttons match the K706 dialpad, hangup and speaker controls.
+        return controls>=3;
+    }
+
     private PhoneUiDetector.Result readPhoneWindow(String pkg,
-            AccessibilityNodeInfo root,AccessibilityEvent event) {
+            AccessibilityNodeInfo root,AccessibilityEvent event,
+            String title,boolean floatingPanel) {
         List<String> labels=new ArrayList<>();
+        if(title!=null && !title.isEmpty())addUnique(labels,title);
         if(event!=null) {
             if(event.getText()!=null)for(CharSequence s:event.getText())
                 if(s!=null)addUnique(labels,s.toString());
@@ -317,6 +359,16 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 addUnique(labels,event.getContentDescription().toString());
         }
         ArrayDeque<AccessibilityNodeInfo> nodes=new ArrayDeque<>();
+        // The event's source is often the phone popup itself while the active
+        // window root points at the underlying media app.
+        if(event!=null) {
+            AccessibilityNodeInfo source=event.getSource();
+            if(source!=null) {
+                nodes.add(source);
+                AccessibilityNodeInfo parent=source.getParent();
+                if(parent!=null)nodes.add(parent);
+            }
+        }
         if(root!=null)nodes.add(root);
         int inspected=0;
         while(!nodes.isEmpty() && inspected++<280) {
@@ -330,7 +382,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(c!=null)nodes.add(c);
             }
         }
-        return PhoneUiDetector.detect(pkg,labels);
+        return PhoneUiDetector.detect(pkg,labels,floatingPanel);
     }
 
     private static void addUnique(List<String> out, String text) {
