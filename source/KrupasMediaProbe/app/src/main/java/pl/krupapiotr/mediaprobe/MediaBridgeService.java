@@ -228,12 +228,12 @@ public final class MediaBridgeService extends Service {
         long positiveSeen = phoneUi.getLong("active_positive_seen",0);
         boolean uiCall = (phoneUi.getBoolean("active",false) &&
                 uiSeen>0 && now>=uiSeen && now-uiSeen<=8000) ||
-                (positiveSeen>0 && now>=positiveSeen && now-positiveSeen<=7000);
+                (positiveSeen>0 && now>=positiveSeen && now-positiveSeen<=4000);
         long windowSeen = phoneUi.getLong("window_seen",0);
         boolean phoneWindow = phoneUi.getBoolean("phone_window",false) &&
                 windowSeen>0 && now>=windowSeen && now-windowSeen<=7000;
         long hintSeen = phoneUi.getLong("caller_positive_seen",0);
-        boolean callerEvidence = hintSeen>0 && now>=hintSeen && now-hintSeen<=7000;
+        boolean callerEvidence = hintSeen>0 && now>=hintSeen && now-hintSeen<=4000;
         CallAudioMonitor.Snapshot audio = callAudio==null?null:callAudio.snapshot();
         boolean audioCandidate = audio!=null && CallAudioRules.likelyCall(
                 audio.mode,audio.sco,audio.voicePlayback,phoneWindow);
