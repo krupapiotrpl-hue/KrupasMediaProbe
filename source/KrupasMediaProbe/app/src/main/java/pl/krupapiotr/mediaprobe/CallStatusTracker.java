@@ -8,7 +8,7 @@ package pl.krupapiotr.mediaprobe;
  * All timestamps are wall-clock milliseconds, consistent with call observers.
  */
 final class CallStatusTracker {
-    static final long EVIDENCE_GRACE_MS = 15_000L;
+    static final long EVIDENCE_GRACE_MS = 6_000L;
 
     private boolean active;
     private long began;
