@@ -1,7 +1,7 @@
-name: KRUPAS Media Pro 1.3.9 K706 TEST
+name: KRUPAS Media Pro 1.3.10 K706 CALL FIX
 on:
   push:
-    branches: ['fix/kmp-139-call-timeout-20261116']
+    branches: ['fix/kmp-1310-k706-call-window-20261117']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,14 +25,14 @@ jobs:
         run: gradle -p source/KrupasMediaProbe testDebugUnitTest assembleDebug --no-daemon --console=plain --stacktrace
       - name: Verify test APK
         run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.9-CALL-TIMEOUT-K706-TEST.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.9-CALL-TIMEOUT-K706-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.3.9-CALL-TIMEOUT-K706-TEST.apk > SHA256SUMS.txt
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.10-K706-CALL-FIX.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.10-K706-CALL-FIX.apk
+          sha256sum KRUPAS-Media-Pro-1.3.10-K706-CALL-FIX.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.3.9-CALL-TIMEOUT-K706-TEST
+          name: KRUPAS-Media-Pro-1.3.10-K706-CALL-FIX
           path: |
-            KRUPAS-Media-Pro-1.3.9-CALL-TIMEOUT-K706-TEST.apk
+            KRUPAS-Media-Pro-1.3.10-K706-CALL-FIX.apk
             SHA256SUMS.txt
             source/KrupasMediaProbe/firmware/Krupas_1_9x22_EMPTY_REFRESH/Krupas_1_9x22_EMPTY_REFRESH.ino
             source/KrupasMediaProbe/TEST_1.3.8_K706.md
