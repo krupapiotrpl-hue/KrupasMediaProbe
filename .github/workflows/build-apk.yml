@@ -1,10 +1,10 @@
-name: KRUPAS Media Pro K706 APK
+name: KRUPAS Media Pro 1.3.7 K706 TEST
 on:
   push:
-    branches: [main, 'fix/**', 'feature/**']
+    branches: ['fix/kmp-137-source-access-20261115']
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,141 +18,28 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Wybierz edytowalne zrodla lub archiwum 0.8
-        run: |
-          if [ ! -f source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MediaBridgeService.java ]; then
-            mkdir -p source
-            tar -xzf KRUPAS_Media_Pro_0.8_source.tar.gz -C source
-          fi
-          test -f source/KrupasMediaProbe/app/src/main/java/pl/krupapiotr/mediaprobe/MediaBridgeService.java
-      - name: Przygotuj Android SDK
-        uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@v4
         with:
           packages: 'platforms;android-35 build-tools;35.0.0'
-      - name: Kompiluj APK
+      - name: Test and build
         run: gradle -p source/KrupasMediaProbe testDebugUnitTest assembleDebug --no-daemon --console=plain --stacktrace
-      - name: Zweryfikuj i nazwij APK
+      - name: Verify test APK
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2-navradio-K706.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.2-navradio-K706.apk KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
-      - name: Osobny plik 1.3.1 tylko dla galezi poprawkowej
-        if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
-        run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.7-SOURCE-ACCESS-K706-TEST.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.7-SOURCE-ACCESS-K706-TEST.apk
+          sha256sum KRUPAS-Media-Pro-1.3.7-SOURCE-ACCESS-K706-TEST.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
-        if: github.ref != 'refs/heads/fix/k706-131-phone-mp3-safe-20261106' && github.ref != 'refs/heads/fix/kmp-132-autostart-youtube-20261109' && github.ref != 'refs/heads/fix/kmp-134-phone-rds-rotation-20261110' && github.ref != 'refs/heads/fix/kmp-136-audio-call-detection-20261110'
         with:
-          name: KRUPAS-Media-Pro-K706-APK
-          path: KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk
+          name: KRUPAS-Media-Pro-1.3.7-SOURCE-ACCESS-K706-TEST
+          path: |
+            KRUPAS-Media-Pro-1.3.7-SOURCE-ACCESS-K706-TEST.apk
+            SHA256SUMS.txt
+            source/KrupasMediaProbe/firmware/Krupas_1_9x22_EMPTY_REFRESH/Krupas_1_9x22_EMPTY_REFRESH.ino
+            source/KrupasMediaProbe/TEST_1.3.7_K706.md
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
+        if: always()
         with:
-          name: KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST-APK
-          path: KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk
-          if-no-files-found: error
-      - name: Przygotuj instalator 1.3.2
-        if: github.ref == 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
-        run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk
-          sha256sum KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk
-      - uses: actions/upload-artifact@v4
-        if: github.ref == 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
-        with:
-          name: KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706-APK
-          path: KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk
-          if-no-files-found: error
-      - name: Publikuj testowe wydanie 1.3.2
-        if: github.ref == 'refs/heads/fix/kmp-132-autostart-youtube-20261109'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if ! gh release view 'v1.3.2-autostart-youtube-k706' >/dev/null 2>&1; then
-            gh release create 'v1.3.2-autostart-youtube-k706' KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.2 K706 - autostart i YouTube' --notes 'TEST: autostart po rozruchu i wznowieniu uslug systemowych; YouTube wysyla YT: zamiast TITLE:; przyciski pozostaja poziomo z przewijaniem; zachowane DAB, telefon i RDS. APK debug, wymaga testu w K706; kompatybilnosc podpisu z obecna instalacja niepotwierdzona.' --prerelease
-          else
-            gh release upload 'v1.3.2-autostart-youtube-k706' KRUPAS-Media-Pro-1.3.2-AUTOSTART-YOUTUBE-K706.apk --clobber
-          fi
-      - name: Publish KMP 1.3.3 phone UI test
-        if: github.ref == 'refs/heads/fix/kmp-133-phone-ui-20261109'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.3-PHONE-UI-K706-TEST.apk
-          if gh release view 'v1.3.3-phone-ui-k706-test' >/dev/null 2>&1; then
-            gh release upload 'v1.3.3-phone-ui-k706-test' KRUPAS-Media-Pro-1.3.3-PHONE-UI-K706-TEST.apk --clobber
-          else
-            gh release create 'v1.3.3-phone-ui-k706-test' KRUPAS-Media-Pro-1.3.3-PHONE-UI-K706-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.3 - telefon K706 TEST' --notes 'Test odczytu okna telefonu K706 przez Accessibility. Dodano diagnostyke TELEFON OKNO K706. Pozostale zrodla FM MP3 YouTube DAB bez zmian. APK debug; instalacja na 1.3.2 moze wymagac odinstalowania z powodu podpisu.' --prerelease
-          fi
-      - name: Publish KMP 1.3.4 phone and station RDS rotation test
-        if: github.ref == 'refs/heads/fix/kmp-134-phone-rds-rotation-20261110'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.4-PHONE-RDS-ROTATION-K706-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.3.4-PHONE-RDS-ROTATION-K706-TEST.apk
-          if gh release view 'v1.3.4-phone-rds-rotation-k706-test' >/dev/null 2>&1; then
-            gh release upload 'v1.3.4-phone-rds-rotation-k706-test' KRUPAS-Media-Pro-1.3.4-PHONE-RDS-ROTATION-K706-TEST.apk --clobber
-          else
-            gh release create 'v1.3.4-phone-rds-rotation-k706-test' KRUPAS-Media-Pro-1.3.4-PHONE-RDS-ROTATION-K706-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.4 - K706 Telefon i Nazwa Stacji RDS' --notes 'TEST: na bazie 1.3.3 i stabilnej 1.3.2. Zrodlo TELEFON wykrywane poprzez okno rozmowy HFP (jezeli elementy sa widoczne dla Accessibility); nazwa stacji NavRadio+ naprzemiennie z aktualnym RDS co 5 sekund. Zachowany poziomy uklad przyciskow, wielkosci czcionek, protokol BLE oraz sciezki FM MP3 YouTube DAB. Wymaga testu na K706. Podpis debug APK moze byc niezgodny z aktualnie zainstalowana aplikacja: nie usuwaj 1.3.2 bez kopii.' --prerelease
-          fi
-
-      - name: Publish KMP 1.3.5 phone window diagnostic test
-        if: github.ref == 'refs/heads/fix/kmp-135-phone-window-diagnostic-20261110'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.5-PHONE-WINDOW-K706-TEST.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.5-PHONE-WINDOW-K706-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.3.5-PHONE-WINDOW-K706-TEST.apk
-          if gh release view 'v1.3.5-phone-window-k706-test' >/dev/null 2>&1; then
-            gh release upload 'v1.3.5-phone-window-k706-test' KRUPAS-Media-Pro-1.3.5-PHONE-WINDOW-K706-TEST.apk --clobber
-          else
-            gh release create 'v1.3.5-phone-window-k706-test' KRUPAS-Media-Pro-1.3.5-PHONE-WINDOW-K706-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.5 - K706 telefon test' --notes 'TEST: Rozpoznawanie okien polaczen z nieznanych pakietow OEM po znacznikach rozmowy, zachowana ochrona przed falszywym wykryciem; usuwanie nieaktualnego bledu sesji po przywroceniu dostepu; T| numer lub T| ROZMOWA. DAB+, FM, RDS, YouTube i uklad czcionek bez zmian. Wymaga testu na Roco K706. Debug APK moze wymagac odinstalowania poprzedniej wersji ze wzgledu na podpis.' --prerelease
-          fi
-      - name: Publish KMP 1.3.6 audio call detection test
-        if: github.ref == 'refs/heads/fix/kmp-136-audio-call-detection-20261110'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.6-AUDIO-CALL-K706-TEST.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.6-AUDIO-CALL-K706-TEST.apk
-          sha256sum KRUPAS-Media-Pro-1.3.6-AUDIO-CALL-K706-TEST.apk
-          if gh release view 'v1.3.6-audio-call-k706-test' >/dev/null 2>&1; then
-            gh release upload 'v1.3.6-audio-call-k706-test' KRUPAS-Media-Pro-1.3.6-AUDIO-CALL-K706-TEST.apk --clobber
-          else
-            gh release create 'v1.3.6-audio-call-k706-test' KRUPAS-Media-Pro-1.3.6-AUDIO-CALL-K706-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.6 - K706 Audio Call TEST' --notes 'TEST: niezalezna detekcja rozmowy przez Android AudioManager: IN_CALL, IN_COMMUNICATION, Bluetooth SCO, aktywny strumien voice. Numer jesli Accessibility go widzi, w przeciwnym razie T| ROZMOWA. Audio diagnostyka. Bez zmian czcionek, przyciskow, FM RDS DAB+ MP3 YouTube. Wymaga testu na K706. APK debug: podpis moze wymagac deinstalacji starej wersji.' --prerelease
-          fi
-      - name: Publikuj osobna testowa wersje 1.3.1 bez nadpisania 1.3.0
-        if: github.ref == 'refs/heads/fix/k706-131-phone-mp3-safe-20261106'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create 'v1.3.1-k706-phone-mp3-test' KRUPAS-Media-Pro-1.3.1-K706-PHONE-MP3-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.1 K706 - telefon MP3 test' --notes 'TEST: HFP nasluch opcjonalny, test PHONE: i poprawne PHONE:OFF. Lokalny MP3 tylko poza DAB/FM/YouTube/MP4. Test wymagany na K706, dostep do HFP moze byc ograniczony przez system. APK podpisany debugowo, przed instalacja zachowaj 1.3.0.' --prerelease
-      - name: Opublikuj test BLE i DAB-Z bez nadpisania stabilnej wersji
-        if: github.ref == 'refs/heads/feature/k706-ble-dab-20261106'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create 'v1.3.0-k706-ble-dab-test' KRUPAS-Media-Pro-1.3.0-K706-BLE-DAB-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.3.0 K706 - BLE + DAB-Z TEST' --notes 'Zapis BLE z potwierdzeniem; DAB-Z MediaSession, powiadomienia i widok; DAB| natywnie po aktualizacji ESP; domyślnie zgodność 1.9x17 przez TITLE (M|). Wymaga weryfikacji na radiu. Podpis debug moze wymagac deinstalacji poprzedniego wydania.' --prerelease
-      - name: Opublikuj osobny testowy APK dla K706
-        if: github.ref == 'refs/heads/fix/k706-rds-larger-fonts-20261106'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create 'v1.2.1-navradio-k706-rds-test' KRUPAS-Media-Pro-1.2.1-navradio-K706-RDS-TEST.apk --target "$GITHUB_SHA" --title 'KRUPAS Media Pro 1.2.1 K706 - RDS TEST' --notes 'Test dynamicznego RDS i wiekszych czcionek. Guziki zostaja poziomo. Debug signing: instalacja na poprzedniej wersji wymaga zgodnego certyfikatu.' --prerelease
-        continue-on-error: true
-      - name: Opublikuj instalator w GitHub Releases
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if ! gh release view 'v1.2-navradio-k706' >/dev/null 2>&1; then
-            gh release create 'v1.2-navradio-k706' --title 'KRUPAS Media Pro 1.2-navradio (K706)' --notes 'Testowa wersja 1.2-navradio: stabilizacja zrodel FM/RDS i MP3, czyszczenie starych danych BLE, diagnostyka K706. APK debug; mozliwy konflikt podpisu ze stara instalacja.'
-          fi
-          gh release upload 'v1.2-navradio-k706' KRUPAS-Media-Pro-1.2-navradio-K706.apk --clobber
-        continue-on-error: true
-
+          name: K706-unit-test-results
+          path: source/KrupasMediaProbe/app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore

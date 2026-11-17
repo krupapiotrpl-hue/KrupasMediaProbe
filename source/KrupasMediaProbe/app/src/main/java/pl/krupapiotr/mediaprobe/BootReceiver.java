@@ -12,6 +12,7 @@ public final class BootReceiver extends BroadcastReceiver {
         String action = i.getAction();
         if (!Intent.ACTION_BOOT_COMPLETED.equals(action) &&
                 !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) return;
+        AccessHealth.event(c, "BOOT " + action);
         startBridge(c, action);
     }
 
@@ -30,3 +31,4 @@ public final class BootReceiver extends BroadcastReceiver {
         }
     }
 }
+
