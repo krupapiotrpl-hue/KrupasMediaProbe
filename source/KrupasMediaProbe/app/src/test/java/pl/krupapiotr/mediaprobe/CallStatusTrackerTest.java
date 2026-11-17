@@ -15,15 +15,15 @@ public class CallStatusTrackerTest {
         CallStatusTracker c = new CallStatusTracker();
         assertTrue(c.update(1000, true, 0));
         assertTrue(c.update(5000, false, 0));
-        assertTrue(c.update(15999, false, 0));
+        assertTrue(c.update(6999, false, 0));
         assertEquals(1000, c.lastEvidenceAt());
     }
 
     @Test public void staleCallClearsEvenIfNoOemHangupBroadcastArrives() {
         CallStatusTracker c = new CallStatusTracker();
         assertTrue(c.update(1000, true, 0));
-        assertTrue(c.update(15999, false, 0));
-        assertFalse(c.update(16000, false, 0));
+        assertTrue(c.update(6999, false, 0));
+        assertFalse(c.update(7000, false, 0));
         assertTrue(c.reason().contains("WYGASZONO"));
         assertFalse(c.update(800000, false, 0));
     }
@@ -31,11 +31,11 @@ public class CallStatusTrackerTest {
     @Test public void freshSignalRestartsGracePeriod() {
         CallStatusTracker c = new CallStatusTracker();
         assertTrue(c.update(1000, true, 0));
-        assertTrue(c.update(10000, false, 0));
-        assertTrue(c.update(15000, true, 0));
-        assertTrue(c.update(29999, false, 0));
-        assertFalse(c.update(30000, false, 0));
-        assertTrue(c.update(30500, true, 0));
+        assertTrue(c.update(5000, false, 0));
+        assertTrue(c.update(6000, true, 0));
+        assertTrue(c.update(11999, false, 0));
+        assertFalse(c.update(12000, false, 0));
+        assertTrue(c.update(12500, true, 0));
     }
 
     @Test public void explicitHangupWinsOverCachedPositiveSignal() {
