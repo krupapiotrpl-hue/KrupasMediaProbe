@@ -106,6 +106,7 @@ public final class MainActivity extends Activity {
                 "AUDIO ROZMOWY: "+d.getString("audio_status","BRAK") +"\n"+
                 "DECYZJA T|: "+d.getString("call_decision","BRAK ODCZYTU") +"\n"+
                 "TELEFON OKNO K706: "+getSharedPreferences("krupas_phone_ui",0).getString("status","BRAK ODCZYTU")+"\n"+
+                "TELEFON OKNA / PANEL: "+getSharedPreferences("krupas_phone_ui",0).getString("windows","BRAK ODCZYTU")+"\n"+
                 "TEST TELEFONU: "+d.getString("phone_test","—")+"\n"+
                 "RADIO: "+d.getString("radio_status","BRAK")+"\n"+
                 "DAB+: "+d.getString("dab_status","BRAK")+"\n"+
