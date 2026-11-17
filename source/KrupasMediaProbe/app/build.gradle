@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 32
-        versionCode 1310
-        versionName '1.3.10-k706-call-window-test'
+        versionCode 1311
+        versionName '1.3.11-k706-overlay-call-test'
     }
 
     buildTypes {
