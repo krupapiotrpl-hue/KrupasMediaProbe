@@ -104,6 +104,7 @@ public final class MainActivity extends Activity {
                 "TELEFON: "+d.getString("phone_status","BRAK")+"\n"+
                 "HFP BLUETOOTH: "+d.getString("hfp_status","BRAK") +"\n"+
                 "AUDIO ROZMOWY: "+d.getString("audio_status","BRAK") +"\n"+
+                "QF OEM BLUETOOTH: "+d.getString("qf_oem_status","BRAK ODCZYTU") +"\n"+
                 "DECYZJA T|: "+d.getString("call_decision","BRAK ODCZYTU") +"\n"+
                 "TELEFON OKNO K706: "+getSharedPreferences("krupas_phone_ui",0).getString("status","BRAK ODCZYTU")+"\n"+
                 "TELEFON OKNA / PANEL: "+getSharedPreferences("krupas_phone_ui",0).getString("windows","BRAK ODCZYTU")+"\n"+
