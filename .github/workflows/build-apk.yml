@@ -1,7 +1,7 @@
-name: KRUPAS Media Pro 1.3.11 K706 CALL FIX
+name: KRUPAS Media Pro 1.3.12 QF OEM BT PROBE
 on:
   push:
-    branches: ['fix/kmp-1311-k706-overlay-call-20261117']
+    branches: ['experiment/kmp-1312-qf-bt-probe-20261119']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,14 +25,14 @@ jobs:
         run: gradle -p source/KrupasMediaProbe testDebugUnitTest assembleDebug --no-daemon --console=plain --stacktrace
       - name: Verify test APK
         run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.11-K706-CALL-FIX.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.11-K706-CALL-FIX.apk
-          sha256sum KRUPAS-Media-Pro-1.3.11-K706-CALL-FIX.apk > SHA256SUMS.txt
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.12-QF-OEM-PROBE.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.12-QF-OEM-PROBE.apk
+          sha256sum KRUPAS-Media-Pro-1.3.12-QF-OEM-PROBE.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.3.11-K706-CALL-FIX
+          name: KRUPAS-Media-Pro-1.3.12-QF-OEM-PROBE
           path: |
-            KRUPAS-Media-Pro-1.3.11-K706-CALL-FIX.apk
+            KRUPAS-Media-Pro-1.3.12-QF-OEM-PROBE.apk
             SHA256SUMS.txt
             source/KrupasMediaProbe/firmware/Krupas_1_9x22_EMPTY_REFRESH/Krupas_1_9x22_EMPTY_REFRESH.ino
             source/KrupasMediaProbe/TEST_1.3.8_K706.md
