@@ -42,6 +42,7 @@ public final class MediaBridgeService extends Service {
     };
     private PhoneCallMonitor phone;
     private HfpCallMonitor hfp;
+    private QfOemBluetoothProbe qfProbe;
     private CallAudioMonitor callAudio;
     private final CallStatusTracker callTracker = new CallStatusTracker();
     private boolean phoneDisplayed;
@@ -76,6 +77,8 @@ public final class MediaBridgeService extends Service {
         phone.start();
         hfp=new HfpCallMonitor(this);
         hfp.start();
+        qfProbe=new QfOemBluetoothProbe(this);
+        qfProbe.start();
         callAudio=new CallAudioMonitor(this);
         registerMusicReceiver();
         IntentFilter wake = new IntentFilter();
@@ -107,6 +110,7 @@ public final class MediaBridgeService extends Service {
         if(wakeRegistered)unregisterReceiver(wakeReceiver);
         if(phone!=null)phone.stop();
         if(hfp!=null)hfp.stop();
+        if(qfProbe!=null)qfProbe.stop();
         if(ble!=null)ble.stop();
         super.onDestroy();
     }
@@ -141,6 +145,7 @@ public final class MediaBridgeService extends Service {
         ble.watchdog();
         AccessHealth.summary(this);
         AccessHealth.recoverNotificationListener(this);
+        if(qfProbe!=null)qfProbe.sample();
         final long now = System.currentTimeMillis();
         final SharedPreferences radio = getSharedPreferences("krupas_radio", 0);
         final String freq = SourceRouter.clean(radio.getString("freq", ""));
