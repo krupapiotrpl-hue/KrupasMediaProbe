@@ -1,7 +1,7 @@
-name: KRUPAS Media Pro 1.3.12 QF OEM BT PROBE
+name: KRUPAS Media Pro 1.3.13 PHONE NUMBER CALL STABILITY
 on:
   push:
-    branches: ['experiment/kmp-1312-qf-bt-probe-20261119']
+    branches: ['fix/kmp-1313-phone-number-call-stability-20261120']
   workflow_dispatch:
 permissions:
   contents: read
