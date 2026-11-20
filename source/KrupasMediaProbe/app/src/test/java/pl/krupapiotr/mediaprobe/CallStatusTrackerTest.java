@@ -35,7 +35,7 @@ public class CallStatusTrackerTest {
         assertTrue(c.update(6000, true, 0));
         assertTrue(c.update(17999, false, 0));
         assertFalse(c.update(18000, false, 0));
-        assertTrue(c.update(12500, true, 0));
+        assertTrue(c.update(18500, true, 0));
     }
 
     @Test public void explicitHangupWinsOverCachedPositiveSignal() {
