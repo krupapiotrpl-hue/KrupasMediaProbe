@@ -172,7 +172,7 @@
 
 #include <Arduino.h>
 
-#define FIRMWARE_VERSION "1.9x22-EMPTY-REFRESH"
+#define FIRMWARE_VERSION "1.9x23-BLE-METADATA-TIMEOUT"
 
 #include <SPI.h>
 
