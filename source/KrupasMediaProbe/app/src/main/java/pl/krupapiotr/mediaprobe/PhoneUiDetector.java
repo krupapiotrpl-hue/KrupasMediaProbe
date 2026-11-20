@@ -8,6 +8,23 @@ final class PhoneUiDetector {
     private static final Pattern NUMBER=Pattern.compile("\\+?[0-9][0-9 ()-]{5,22}[0-9]");
     private PhoneUiDetector() {}
 
+    // Only a recognizable number is allowed to replace the generic call label.
+    // No contacts or call history access; the raw number stays out of diagnostics.
+    static String firstNumber(String... labels) {
+        if (labels == null) return "";
+        for (String raw : labels) {
+            if (raw == null) continue;
+            String s = raw.trim().replaceFirst(
+                    "(?iu)^(?:tel(?:efon)?|numer|number|phone)\\s*[:：]\\s*", "");
+            if (!NUMBER.matcher(s).matches()) continue;
+            int digits = 0;
+            for (int j = 0; j < s.length(); j++)
+                if (Character.isDigit(s.charAt(j))) digits++;
+            if (digits >= 7 && digits <= 15) return s;
+        }
+        return "";
+    }
+
     static boolean isCandidate(String pkg) {
         if(pkg==null)return false;
         String p=pkg.toLowerCase(Locale.ROOT);
@@ -49,10 +66,7 @@ final class PhoneUiDetector {
             if(any(t,"dialing","calling...","outgoing call","wybieranie","wybiera","dzwonienie"))outgoing=true;
             if(any(t,"incoming call","przychodzące","przychodzace"))ringing=true;
             if(s.matches("[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?"))timer=true;
-            if(number.isEmpty() && NUMBER.matcher(s).matches()) {
-                int digits=0;for(int i=0;i<s.length();i++)if(Character.isDigit(s.charAt(i)))digits++;
-                if(digits>=7 && digits<=15)number=s;
-            }
+            if (number.isEmpty()) number = firstNumber(s);
         }
         boolean active=!ended&&(end||(accept&&reject));
         // The K706 vendor phone package is not fixed across ROM releases.
