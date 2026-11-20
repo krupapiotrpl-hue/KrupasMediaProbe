@@ -262,10 +262,19 @@ public final class MediaBridgeService extends Service {
         if(ongoingCall)testPhoneUntil=0;
         boolean testCall=!ongoingCall && now<testPhoneUntil;
         if(ongoingCall||testCall){
-            String caller=hfpActive?hfp.display():localCall?phone.display():
-                    uiCall?SourceRouter.clean(phoneUi.getString("display","ROZMOWA")):
-                    callerEvidence?SourceRouter.clean(phoneUi.getString("caller_hint","")):
-                    ongoingCall?SourceRouter.clean(lastPhoneText):"TEST TELEFONU";
+            // A real number has priority across ALL observers, even if a different
+            // observer detects the call first and offers only "ROZMOWA".
+            String caller=PhoneUiDetector.firstNumber(
+                    hfpActive?hfp.display():"",
+                    phoneUi.getString("display",""),
+                    callerEvidence?phoneUi.getString("caller_hint",""):"",
+                    ongoingCall?lastPhoneText:"");
+            if(caller.isEmpty()) {
+                caller=hfpActive?hfp.display():localCall?phone.display():
+                        uiCall?SourceRouter.clean(phoneUi.getString("display","ROZMOWA")):
+                        callerEvidence?SourceRouter.clean(phoneUi.getString("caller_hint","")):
+                        ongoingCall?SourceRouter.clean(lastPhoneText):"TEST TELEFONU";
+            }
             if(caller.isEmpty())caller="ROZMOWA";
             diag("route",testCall?"TELEFON / TEST":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
