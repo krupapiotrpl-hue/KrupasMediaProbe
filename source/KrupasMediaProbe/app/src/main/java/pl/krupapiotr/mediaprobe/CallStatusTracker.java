@@ -8,7 +8,7 @@ package pl.krupapiotr.mediaprobe;
  * All timestamps are wall-clock milliseconds, consistent with call observers.
  */
 final class CallStatusTracker {
-    static final long EVIDENCE_GRACE_MS = 6_000L;
+    static final long EVIDENCE_GRACE_MS = 12_000L;
 
     private boolean active;
     private long began;
@@ -40,7 +40,7 @@ final class CallStatusTracker {
             final long missingMs = Math.max(0L, now - lastEvidence);
             if (missingMs >= EVIDENCE_GRACE_MS) {
                 active = false;
-                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ 6 S";
+                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ 12 S";
             } else {
                 reason = "PODTRZYMANIE - BRAK NOWEGO SYGNALU";
             }
