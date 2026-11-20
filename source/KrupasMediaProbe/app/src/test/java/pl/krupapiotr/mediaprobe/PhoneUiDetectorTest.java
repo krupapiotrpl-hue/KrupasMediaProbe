@@ -10,6 +10,15 @@ public class PhoneUiDetectorTest {
         assertTrue(r.active);assertEquals("+48 501 234 567",r.display);
         assertFalse(r.diagnostic.contains("501 234 567"));
     }
+    @Test public void numberPriorityAcrossCallObservers() {
+        assertEquals("+48 501 234 567", PhoneUiDetector.firstNumber(
+                "ROZMOWA", "Polaczenie", "Telefon: +48 501 234 567"));
+        assertEquals("501234567", PhoneUiDetector.firstNumber(
+                "ROZMOWA", "501234567", "510111222"));
+        assertEquals("", PhoneUiDetector.firstNumber(
+                "ROZMOWA", "00:31", "Numer prywatny"));
+    }
+
     @Test public void incomingWithoutNumber() {
         PhoneUiDetector.Result r=PhoneUiDetector.detect("com.tw.bt",
                 Arrays.asList("Incoming call","Answer call","Reject call"));
