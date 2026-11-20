@@ -2566,6 +2566,13 @@ MediaSource selectedSource = MEDIA_UNKNOWN;
 String dabText = "";
 String callText = "";
 bool callActive = false;
+
+// BLE metadata watchdog (1.9x23 experimental):
+// Android sends active content about every 10 seconds; expire only media/call.
+// No CAN, ISO-TP, coolant, BLE UUID, or scrolling changes.
+static const uint32_t BLE_METADATA_TIMEOUT_MS = 45000UL;
+uint32_t lastBleMetadataMs = 0;
+bool bleMetadataLeaseActive = false;
 // Zrodlo pozostaje aktywne podczas rozmowy; PHONE:OFF odslania je ponownie.
 // Metadane naplywajace podczas rozmowy aktualizuja zapisane zrodlo.
 
@@ -2641,6 +2648,24 @@ void handleBleMessage(String message) {
       control == "CLEAR:FM" || control == "CLEAR:MEDIA" ||
       control == "CLEAR:TITLE" || control == "CLEAR:ALL" ||
       control == "CALL:OFF" || control == "PHONE:OFF") upper = control;
+
+  // Refresh only when genuinely active metadata arrives, never on CLEAR/STOP.
+  // Note: deduplicated titles are still heartbeats; no scroll restart.
+  if (upper.startsWith("RDS:") || upper.startsWith("FM:") ||
+      upper.startsWith("TITLE:") || upper.startsWith("YT:") ||
+      upper.startsWith("MP3:") || upper.startsWith("RADIO:") ||
+      upper.startsWith("M|") || upper.startsWith("R|") ||
+      upper.startsWith(">|") || upper.startsWith("T|") ||
+      upper.startsWith("PHONE:") || upper.startsWith("CALL:") ||
+      upper.startsWith("DAB:TEXT:") || upper.startsWith("DAB+:")) {
+    bool stopFrame = upper == "PHONE:OFF" || upper == "PHONE:END" ||
+                     upper == "CALL:OFF" || upper == "CALL:END" ||
+                     upper == "CALL:STOP" || upper == "DAB:STOP";
+    if (!stopFrame) {
+      lastBleMetadataMs = millis();
+      bleMetadataLeaseActive = true;
+    }
+  }
 
   if (upper.startsWith("SOURCE:")) {
     String value = upper.substring(7); value.trim();
@@ -2903,6 +2928,22 @@ void loop() {
   }
 
   const uint32_t now = millis();
+  if (bleMetadataLeaseActive &&
+      (uint32_t)(now - lastBleMetadataMs) >= BLE_METADATA_TIMEOUT_MS) {
+    // A stale phone/media/RDS overlay cannot survive for hours after BLE sleep.
+    // This only clears BLE-owned metadata. Coolant and CAN stay fully active.
+    bleMetadataLeaseActive = false;
+    radioRds = "";
+    radioFrequency = "";
+    mediaTitle = "";
+    dabText = "";
+    mediaTitleSource = MEDIA_UNKNOWN;
+    selectedSource = MEDIA_UNKNOWN;
+    callActive = false;
+    callText = "";
+    redrawActiveSource();
+    Serial.println("[BLE] Media watchdog expired after 45s: cleared");
+  }
   if (now - lastDiagnosticMs >= 30000UL) {
     lastDiagnosticMs = now;
     Serial.printf("[HEALTH] ESP " FIRMWARE_VERSION
