@@ -262,8 +262,16 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(result.phoneWindow && (phoneWindowHint==null ||
                         (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
                     phoneWindowHint=result;
-                if(result.active){detected=result;break;}
-                if(detected==null || PhoneUiDetector.isCandidate(pkg))detected=result;
+                // Do not stop on the first active SystemUI window: the vendor
+                // phone window inspected later can contain the actual caller number.
+                if(result.active) {
+                    if(detected==null || !detected.active ||
+                            (PhoneUiDetector.firstNumber(detected.display).isEmpty() &&
+                             !PhoneUiDetector.firstNumber(result.display).isEmpty()))
+                        detected=result;
+                } else if(detected==null || (!detected.active && PhoneUiDetector.isCandidate(pkg))) {
+                    detected=result;
+                }
             }
         } catch(Exception ex) {
             getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
@@ -279,7 +287,10 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(result.phoneWindow && (phoneWindowHint==null ||
                         (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
                     phoneWindowHint=result;
-                if(result.active||detected==null)detected=result;
+                if(detected==null || (result.active && (!detected.active ||
+                        (PhoneUiDetector.firstNumber(detected.display).isEmpty() &&
+                         !PhoneUiDetector.firstNumber(result.display).isEmpty()))))
+                    detected=result;
             }
         }
         getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
