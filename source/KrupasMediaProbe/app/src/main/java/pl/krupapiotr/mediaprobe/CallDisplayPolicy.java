@@ -54,9 +54,17 @@ final class CallDisplayPolicy {
     }
 
     static String display(String phase, String confirmedNumber, boolean test) {
+        return display(phase, confirmedNumber, "", test);
+    }
+
+    static String display(String phase, String confirmedNumber, String confirmedName, boolean test) {
         if (test) return "TEST TELEFONU";
         if (DIALING.equals(phase)) return "WYBIERANIE";
         if (RINGING.equals(phase)) return "POŁĄCZENIE";
+        // A name from the confirmed call window or call notification wins
+        // over the number. Never use an arbitrary accessibility label.
+        String name = PhoneUiDetector.firstName(confirmedName);
+        if (!name.isEmpty()) return name;
         String number = PhoneUiDetector.firstNumber(confirmedNumber);
         return number.isEmpty() ? "ROZMOWA" : number;
     }
