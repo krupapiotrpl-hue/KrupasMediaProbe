@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 32
-        versionCode 1313
-        versionName '1.3.13-phone-number-call-stability'
+        versionCode 1314
+        versionName '1.3.14-QF-BT-ROZMOWA-TEST'
     }
 
     buildTypes {
