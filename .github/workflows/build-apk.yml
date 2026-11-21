@@ -1,7 +1,7 @@
-name: KRUPAS Media Pro 1.3.13 PHONE NUMBER CALL STABILITY
+name: KRUPAS Media Pro 1.3.14 QF BT AUTO ROZMOWA
 on:
   push:
-    branches: ['fix/kmp-1313-phone-number-call-stability-20261120']
+    branches: ['experiment/kmp-1314-qf-event-counter-20261121']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,14 +25,14 @@ jobs:
         run: gradle -p source/KrupasMediaProbe testDebugUnitTest assembleDebug --no-daemon --console=plain --stacktrace
       - name: Verify test APK
         run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.13-PHONE-FIX.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.13-PHONE-FIX.apk
-          sha256sum KRUPAS-Media-Pro-1.3.13-PHONE-FIX.apk > SHA256SUMS.txt
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.14-QF-BT-AUTO.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.14-QF-BT-AUTO.apk
+          sha256sum KRUPAS-Media-Pro-1.3.14-QF-BT-AUTO.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.3.13-PHONE-FIX
+          name: KRUPAS-Media-Pro-1.3.14-QF-BT-AUTO
           path: |
-            KRUPAS-Media-Pro-1.3.13-PHONE-FIX.apk
+            KRUPAS-Media-Pro-1.3.14-QF-BT-AUTO.apk
             SHA256SUMS.txt
             source/KrupasMediaProbe/firmware/Krupas_1_9x22_EMPTY_REFRESH/Krupas_1_9x22_EMPTY_REFRESH.ino
             source/KrupasMediaProbe/TEST_1.3.8_K706.md
