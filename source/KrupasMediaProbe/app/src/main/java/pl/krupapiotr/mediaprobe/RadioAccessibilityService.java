@@ -313,6 +313,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
                     .edit().putBoolean("active",detected.active)
                     .putString("pkg",detected.pkg)
                     .putString("status",detected.diagnostic)
+                    .putString("phase",detected.phase)
                     .putLong("seen",System.currentTimeMillis());
             if(detected.active){
                 edit.putString("display",detected.display);
@@ -322,7 +323,7 @@ public final class RadioAccessibilityService extends AccessibilityService {
             edit.apply();
         } else {
             getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
-                    .putBoolean("active",false).remove("display")
+                    .putBoolean("active",false).remove("display").remove("phase")
                     .putString("status","BRAK OKNA ROZMOWY / okna="+inspectedWindows+
                             " / pakiety="+seenPackages.toString().trim())
                     .putLong("seen",System.currentTimeMillis()).apply();
