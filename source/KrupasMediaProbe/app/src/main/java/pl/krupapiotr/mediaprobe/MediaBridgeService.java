@@ -261,7 +261,16 @@ public final class MediaBridgeService extends Service {
                     elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":""));
         if(ongoingCall)testPhoneUntil=0;
         boolean testCall=!ongoingCall && now<testPhoneUntil;
-        if(ongoingCall||testCall){
+        // Experimental automatic fallback: QF BT connection is NOT proof of a call.
+        // Keep actual HFP/UI/telephony call detection (and caller number) at higher priority.
+        boolean qfFallback = QfFallbackPolicy.shouldShow(
+                qfProbe!=null && qfProbe.phoneConnected(),
+                getSharedPreferences("krupas_settings",0).getBoolean("qf_bt_fallback_call",true),
+                ongoingCall,testCall);
+        diag("qf_call_fallback",qfFallback ?
+                "AKTYWNY: BT POLACZONY - T|ROZMOWA (NIE POTWIERDZA ROZMOWY)" :
+                "NIEAKTYWNY");
+        if(ongoingCall||testCall||qfFallback){
             // A real number has priority across ALL observers, even if a different
             // observer detects the call first and offers only "ROZMOWA".
             String caller=PhoneUiDetector.firstNumber(
@@ -276,7 +285,11 @@ public final class MediaBridgeService extends Service {
                         ongoingCall?SourceRouter.clean(lastPhoneText):"TEST TELEFONU";
             }
             if(caller.isEmpty())caller="ROZMOWA";
-            diag("route",testCall?"TELEFON / TEST":
+            // For BT-only fallback show the requested label; never invent a number.
+            // A real call overrides this path and retains number priority.
+            if(qfFallback)caller="ROZMOWA";
+            diag("route",testCall?"TELEFON / TEST":qfFallback?
+                    "TELEFON / QF BT (STATUS ROZMOWY NIEPOTWIERDZONY)":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
             if(ble.ready()&&(!phoneDisplayed||!caller.equals(lastPhoneText)||
                     now-lastPhoneSent>=10000)){
