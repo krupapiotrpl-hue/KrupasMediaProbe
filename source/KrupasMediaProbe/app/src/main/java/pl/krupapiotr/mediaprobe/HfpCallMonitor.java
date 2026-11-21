@@ -122,6 +122,10 @@ final class HfpCallMonitor {
 
     long endedAt(){return endedAt;}
 
+    String phase() {
+        return active() ? CallDisplayPolicy.fromHfpState(callState) : "";
+    }
+
     String status() {
         if (!active()) return "HFP: brak aktywnej rozmowy";
         return "HFP: " + (outgoing ? "WYCHODZACE" : "PRZYCHODZACE") +

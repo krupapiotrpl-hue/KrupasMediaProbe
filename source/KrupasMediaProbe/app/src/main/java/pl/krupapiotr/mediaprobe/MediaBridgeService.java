@@ -268,27 +268,30 @@ public final class MediaBridgeService extends Service {
                     elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":""));
         if(ongoingCall)testPhoneUntil=0;
         boolean testCall=!ongoingCall && now<testPhoneUntil;
-        // Automatic Opel phone overlay needs evidence of a call, not BT pairing.
+        // Phone overlays are emitted only on confirmed call evidence. ESP
+        // renders the existing T| marker from a PHONE: payload.
         if(ongoingCall||testCall){
-            String caller=PhoneUiDetector.firstNumber(
+            String phase=CallDisplayPolicy.select(
+                    hfpActive, hfpActive?hfp.phase():"",
+                    uiCall, uiCall?phoneUi.getString("phase",""):"",
+                    phone!=null&&phone.isRinging(),
+                    notificationCall.active,notificationCall.phase);
+            String number=PhoneUiDetector.firstNumber(
                     hfpActive?hfp.display():"",
                     uiCall?phoneUi.getString("display",""):"",
                     callerEvidence?phoneUi.getString("caller_hint",""):"",
-                    notificationCall.active?notificationCall.display:"",
-                    ongoingCall?lastPhoneText:"");
-            if(caller.isEmpty()){
-                caller=PhoneUiDetector.firstName(
-                        uiCall?phoneUi.getString("display",""):"",
-                        notificationCall.active?notificationCall.display:"",
-                        ongoingCall?lastPhoneText:"");
-            }
-            if(caller.isEmpty())caller=testCall?"TEST TELEFONU":"ROZMOWA";
+                    notificationCall.active?notificationCall.display:"");
+            // Never show a number during ringing/dialing, and never reuse
+            // a number from an earlier call as the new caller's identity.
+            String display=CallDisplayPolicy.display(phase,number,testCall);
+            diag("call_phase",(testCall?"TEST":phase)+
+                    " / numer_dostepny="+(!number.isEmpty()));
             diag("route",testCall?"TELEFON / TEST":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
-            if(ble.ready()&&(!phoneDisplayed||!caller.equals(lastPhoneText)||
+            if(ble.ready()&&(!phoneDisplayed||!display.equals(lastPhoneText)||
                     now-lastPhoneSent>=10000)){
-                ble.send("PHONE:"+caller);
-                lastPhoneText=caller;
+                ble.send("PHONE:"+display);
+                lastPhoneText=display;
                 phoneDisplayed=true;
                 lastPhoneSent=now;
             }

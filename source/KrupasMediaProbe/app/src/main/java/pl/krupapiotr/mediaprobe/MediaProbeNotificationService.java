@@ -24,10 +24,11 @@ public class MediaProbeNotificationService extends NotificationListenerService {
 
     static final class CallSnapshot {
         final boolean active;
-        final String display, pkg;
+        final String display, pkg, phase;
         final boolean hasNumber;
-        CallSnapshot(boolean active,String display,String pkg,boolean hasNumber) {
+        CallSnapshot(boolean active,String display,String pkg,boolean hasNumber,String phase) {
             this.active=active; this.display=display; this.pkg=pkg; this.hasNumber=hasNumber;
+            this.phase=phase;
         }
     }
 
@@ -35,11 +36,11 @@ public class MediaProbeNotificationService extends NotificationListenerService {
     // A Bluetooth-connected state or normal music notification is not a call.
     static CallSnapshot activeCall(android.content.Context context) {
         MediaProbeNotificationService svc=connected;
-        if(svc==null)return new CallSnapshot(false,"","",false);
+        if(svc==null)return new CallSnapshot(false,"","",false,"");
         try {
             StatusBarNotification[] active=svc.getActiveNotifications();
-            if(active==null)return new CallSnapshot(false,"","",false);
-            CallSnapshot best=new CallSnapshot(false,"","",false);
+            if(active==null)return new CallSnapshot(false,"","",false,"");
+            CallSnapshot best=new CallSnapshot(false,"","",false,"");
             for(StatusBarNotification item:active) {
                 if(item==null || item.getNotification()==null ||
                         context.getPackageName().equals(item.getPackageName()))continue;
@@ -51,14 +52,15 @@ public class MediaProbeNotificationService extends NotificationListenerService {
                         n.fullScreenIntent!=null,title,body))continue;
                 String label=CallNotificationPolicy.display(title,body,sub);
                 boolean number=!PhoneUiDetector.firstNumber(label).isEmpty();
-                CallSnapshot candidate=new CallSnapshot(true,label,item.getPackageName(),number);
+                CallSnapshot candidate=new CallSnapshot(true,label,item.getPackageName(),number,
+                        CallDisplayPolicy.fromNotification(title,body,sub));
                 if(!best.active || (number&&!best.hasNumber))best=candidate;
             }
             return best;
         }catch(Exception e) {
             context.getSharedPreferences("krupas_diag",0).edit()
                     .putString("call_notification_error",e.getClass().getSimpleName()).apply();
-            return new CallSnapshot(false,"","",false);
+            return new CallSnapshot(false,"","",false,"");
         }
     }
 
