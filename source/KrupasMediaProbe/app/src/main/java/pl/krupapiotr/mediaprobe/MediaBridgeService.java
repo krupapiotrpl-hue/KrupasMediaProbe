@@ -283,9 +283,19 @@ public final class MediaBridgeService extends Service {
                     notificationCall.active?notificationCall.display:"");
             // Never show a number during ringing/dialing, and never reuse
             // a number from an earlier call as the new caller's identity.
-            String display=CallDisplayPolicy.display(phase,number,testCall);
+            // A fresh name from the confirmed OEM call window or active call
+            // notification takes precedence over the number. No contacts
+            // permission or phonebook syncing is required for this path.
+            long callerNameSeen=phoneUi.getLong("caller_name_seen",0);
+            boolean freshUiName=uiCall && callerNameSeen>0 && now>=callerNameSeen &&
+                    now-callerNameSeen<=6000;
+            String callerName=PhoneUiDetector.firstName(
+                    freshUiName?phoneUi.getString("caller_name",""):"",
+                    notificationCall.active?notificationCall.callerName:"");
+            String display=CallDisplayPolicy.display(phase,number,callerName,testCall);
             diag("call_phase",(testCall?"TEST":phase)+
-                    " / numer_dostepny="+(!number.isEmpty()));
+                    " / numer_dostepny="+(!number.isEmpty())+
+                    " / nazwa_dostepna="+(!callerName.isEmpty()));
             diag("route",testCall?"TELEFON / TEST":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
             if(ble.ready()&&(!phoneDisplayed||!display.equals(lastPhoneText)||
