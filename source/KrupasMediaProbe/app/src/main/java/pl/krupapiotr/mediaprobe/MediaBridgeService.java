@@ -242,14 +242,21 @@ public final class MediaBridgeService extends Service {
         CallAudioMonitor.Snapshot audio = callAudio==null?null:callAudio.snapshot();
         boolean audioCandidate = audio!=null && CallAudioRules.likelyCall(
                 audio.mode,audio.sco,audio.voicePlayback,phoneWindow);
-        boolean callConfirmed = hfpActive || localCall || uiCall || audioCandidate || callerEvidence;
+        MediaProbeNotificationService.CallSnapshot notificationCall =
+                MediaProbeNotificationService.activeCall(this);
+        boolean callConfirmed = hfpActive || localCall || uiCall ||
+                audioCandidate || callerEvidence || notificationCall.active;
+        diag("call_notification",notificationCall.active?
+                "AKTYWNE / pkg="+notificationCall.pkg+" / numer="+notificationCall.hasNumber:
+                "BRAK");
         // End signals are explicit: HFP TERMINATED, telephony IDLE transition or UI ended.
         long endAt = Math.max(phoneUi.getLong("ended_seen",0),
                 Math.max(hfp==null?0:hfp.endedAt(),phone==null?0:phone.endedAt()));
         boolean ongoingCall = callTracker.update(now,callConfirmed,endAt);
         String evidence = hfpActive ? "HFP" : localCall ? "TELEFONIA" :
                 uiCall ? "OKNO ROZMOWY" : audioCandidate ? "AUDIO BT" :
-                callerEvidence ? "OKNO BT + NUMER" : "BRAK";
+                callerEvidence ? "OKNO BT + NUMER" :
+                notificationCall.active ? "POWIADOMIENIE ROZMOWY" : "BRAK";
         diag("audio_status",(audio==null?"NIEDOSTEPNE":audio.status())+
                 " / oknoBT="+phoneWindow+" / probka="+audioCandidate+
                 " / rozmowa="+ongoingCall);
@@ -261,35 +268,22 @@ public final class MediaBridgeService extends Service {
                     elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":""));
         if(ongoingCall)testPhoneUntil=0;
         boolean testCall=!ongoingCall && now<testPhoneUntil;
-        // Experimental automatic fallback: QF BT connection is NOT proof of a call.
-        // Keep actual HFP/UI/telephony call detection (and caller number) at higher priority.
-        boolean qfFallback = QfFallbackPolicy.shouldShow(
-                qfProbe!=null && qfProbe.phoneConnected(),
-                getSharedPreferences("krupas_settings",0).getBoolean("qf_bt_fallback_call",true),
-                ongoingCall,testCall);
-        diag("qf_call_fallback",qfFallback ?
-                "AKTYWNY: BT POLACZONY - T|ROZMOWA (NIE POTWIERDZA ROZMOWY)" :
-                "NIEAKTYWNY");
-        if(ongoingCall||testCall||qfFallback){
-            // A real number has priority across ALL observers, even if a different
-            // observer detects the call first and offers only "ROZMOWA".
+        // Automatic Opel phone overlay needs evidence of a call, not BT pairing.
+        if(ongoingCall||testCall){
             String caller=PhoneUiDetector.firstNumber(
                     hfpActive?hfp.display():"",
-                    phoneUi.getString("display",""),
+                    uiCall?phoneUi.getString("display",""):"",
                     callerEvidence?phoneUi.getString("caller_hint",""):"",
+                    notificationCall.active?notificationCall.display:"",
                     ongoingCall?lastPhoneText:"");
-            if(caller.isEmpty()) {
-                caller=hfpActive?hfp.display():localCall?phone.display():
-                        uiCall?SourceRouter.clean(phoneUi.getString("display","ROZMOWA")):
-                        callerEvidence?SourceRouter.clean(phoneUi.getString("caller_hint","")):
-                        ongoingCall?SourceRouter.clean(lastPhoneText):"TEST TELEFONU";
+            if(caller.isEmpty()){
+                caller=PhoneUiDetector.firstName(
+                        uiCall?phoneUi.getString("display",""):"",
+                        notificationCall.active?notificationCall.display:"",
+                        ongoingCall?lastPhoneText:"");
             }
-            if(caller.isEmpty())caller="ROZMOWA";
-            // For BT-only fallback show the requested label; never invent a number.
-            // A real call overrides this path and retains number priority.
-            if(qfFallback)caller="ROZMOWA";
-            diag("route",testCall?"TELEFON / TEST":qfFallback?
-                    "TELEFON / QF BT (STATUS ROZMOWY NIEPOTWIERDZONY)":
+            if(caller.isEmpty())caller=testCall?"TEST TELEFONU":"ROZMOWA";
+            diag("route",testCall?"TELEFON / TEST":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
             if(ble.ready()&&(!phoneDisplayed||!caller.equals(lastPhoneText)||
                     now-lastPhoneSent>=10000)){
