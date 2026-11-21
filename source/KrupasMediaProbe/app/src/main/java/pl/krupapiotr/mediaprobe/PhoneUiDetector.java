@@ -65,7 +65,7 @@ final class PhoneUiDetector {
     // the OEM doesn't always expose its "wybiera..." text to Accessibility.
     static Result detect(String pkg,List<String> labels,boolean floatingPhonePanel) {
         if(pkg==null || pkg.trim().isEmpty() || pkg.startsWith("pl.krupapiotr."))
-            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg,"",false,false);
+            return new Result(false,"","POMINIETE OKNO APLIKACJI",pkg,"",false,false,"");
         final boolean knownPhonePackage=isCandidate(pkg);
         boolean end=false,accept=false,reject=false,outgoing=false,ringing=false,timer=false,ended=false;
         String number=""; int count=0;
@@ -112,7 +112,8 @@ final class PhoneUiDetector {
         return new Result(active,active?(number.isEmpty()?
                         (contactName.isEmpty()?"ROZMOWA":contactName):number):"",diagnostic,pkg,
                 (knownPhonePackage || active) ? number : "",
-                (knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg)) || active,ended);
+                (knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg)) || active,ended,
+                active ? CallDisplayPolicy.fromUi(outgoing,ringing) : "");
     }
 
     private static boolean any(String s,String... parts) {
@@ -121,11 +122,12 @@ final class PhoneUiDetector {
     }
     static final class Result {
         final boolean active, phoneWindow, ended;
-        final String display,diagnostic,pkg,callerHint;
+        final String display,diagnostic,pkg,callerHint,phase;
         Result(boolean active,String display,String diagnostic,String pkg,String callerHint,
-               boolean phoneWindow,boolean ended) {
+               boolean phoneWindow,boolean ended,String phase) {
             this.active=active;this.display=display;this.diagnostic=diagnostic;this.pkg=pkg;
             this.callerHint=callerHint;this.phoneWindow=phoneWindow;this.ended=ended;
+            this.phase=phase;
         }
     }
 }
