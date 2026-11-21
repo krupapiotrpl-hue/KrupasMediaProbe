@@ -37,6 +37,15 @@ public final class MainActivity extends Activity {
         dabNative.setOnCheckedChangeListener((button,checked)->getSharedPreferences("krupas_settings",0)
                 .edit().putBoolean("dab_native_protocol",checked).apply());
         root.addView(dabNative);
+        CheckBox qfAutoCall=new CheckBox(this);
+        qfAutoCall.setText("QF BT: pokazuj ROZMOWA na Oplu, gdy telefon jest połączony (test)");
+        qfAutoCall.setTextSize(16);
+        qfAutoCall.setChecked(getSharedPreferences("krupas_settings",0)
+                .getBoolean("qf_bt_fallback_call",true));
+        qfAutoCall.setOnCheckedChangeListener((button,checked)->
+                getSharedPreferences("krupas_settings",0).edit()
+                        .putBoolean("qf_bt_fallback_call",checked).apply());
+        root.addView(qfAutoCall);
         HorizontalScrollView buttonsScroll=new HorizontalScrollView(this);
         buttonsScroll.setHorizontalScrollBarEnabled(true);
         buttonsScroll.setFillViewport(true);
@@ -105,6 +114,7 @@ public final class MainActivity extends Activity {
                 "HFP BLUETOOTH: "+d.getString("hfp_status","BRAK") +"\n"+
                 "AUDIO ROZMOWY: "+d.getString("audio_status","BRAK") +"\n"+
                 "QF OEM BLUETOOTH: "+d.getString("qf_oem_status","BRAK ODCZYTU") +"\n"+
+                "QF KOMUNIKAT: "+d.getString("qf_call_fallback","BRAK ODCZYTU")+"\n"+
                 "DECYZJA T|: "+d.getString("call_decision","BRAK ODCZYTU") +"\n"+
                 "TELEFON OKNO K706: "+getSharedPreferences("krupas_phone_ui",0).getString("status","BRAK ODCZYTU")+"\n"+
                 "TELEFON OKNA / PANEL: "+getSharedPreferences("krupas_phone_ui",0).getString("windows","BRAK ODCZYTU")+"\n"+
