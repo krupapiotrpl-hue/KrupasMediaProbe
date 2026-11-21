@@ -239,6 +239,9 @@ public final class RadioAccessibilityService extends AccessibilityService {
         lastPhoneScan=uptime;
         PhoneUiDetector.Result detected=null;
         PhoneUiDetector.Result phoneWindowHint=null;
+        // Caller names are accepted only from positively detected call windows.
+        String activeCallerName="";
+        String activeCallerNumber="";
         int inspectedWindows=0;
         int floatingPanels=0;
         StringBuilder seenPackages=new StringBuilder();
@@ -259,6 +262,14 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 String title=(android.os.Build.VERSION.SDK_INT>=24 && window.getTitle()!=null)
                         ? window.getTitle().toString() : "";
                 PhoneUiDetector.Result result=readPhoneWindow(pkg,root,null,title,floatingPanel);
+                if(result.active && !result.callerName.isEmpty()) {
+                    String candidateNumber=PhoneUiDetector.firstNumber(result.display);
+                    if(activeCallerName.isEmpty() ||
+                            (activeCallerNumber.isEmpty() && !candidateNumber.isEmpty())) {
+                        activeCallerName=result.callerName;
+                        activeCallerNumber=candidateNumber;
+                    }
+                }
                 if(result.phoneWindow && (phoneWindowHint==null ||
                         (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
                     phoneWindowHint=result;
@@ -284,6 +295,10 @@ public final class RadioAccessibilityService extends AccessibilityService {
                 if(root!=null && root.getPackageName()!=null &&
                         !pkg.equals(root.getPackageName().toString()))root=null;
                 PhoneUiDetector.Result result=readPhoneWindow(pkg,root,event,"",false);
+                if(result.active && !result.callerName.isEmpty() && activeCallerName.isEmpty()) {
+                    activeCallerName=result.callerName;
+                    activeCallerNumber=PhoneUiDetector.firstNumber(result.display);
+                }
                 if(result.phoneWindow && (phoneWindowHint==null ||
                         (phoneWindowHint.callerHint.isEmpty() && !result.callerHint.isEmpty())))
                     phoneWindowHint=result;
@@ -318,12 +333,30 @@ public final class RadioAccessibilityService extends AccessibilityService {
             if(detected.active){
                 edit.putString("display",detected.display);
                 edit.putLong("active_positive_seen",System.currentTimeMillis());
-            }else edit.remove("display");
+                String name=detected.callerName;
+                if(name.isEmpty() && !activeCallerName.isEmpty()) {
+                    String selectedNumber=PhoneUiDetector.firstNumber(detected.display);
+                    if(selectedNumber.isEmpty() || activeCallerNumber.isEmpty() ||
+                            selectedNumber.replaceAll("[^0-9]","").equals(
+                                    activeCallerNumber.replaceAll("[^0-9]","")))
+                        name=activeCallerName;
+                }
+                if(!name.isEmpty()) {
+                    edit.putString("caller_name",name)
+                            .putLong("caller_name_seen",System.currentTimeMillis());
+                } else if(!CallDisplayPolicy.CONNECTED.equals(detected.phase)) {
+                    // A new dialing/ringing phase must not inherit an old name.
+                    edit.remove("caller_name").remove("caller_name_seen");
+                }
+            }else {
+                edit.remove("display").remove("caller_name").remove("caller_name_seen");
+            }
             if(detected.ended)edit.putLong("ended_seen",System.currentTimeMillis());
             edit.apply();
         } else {
             getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
                     .putBoolean("active",false).remove("display").remove("phase")
+                    .remove("caller_name").remove("caller_name_seen")
                     .putString("status","BRAK OKNA ROZMOWY / okna="+inspectedWindows+
                             " / pakiety="+seenPackages.toString().trim())
                     .putLong("seen",System.currentTimeMillis()).apply();
