@@ -10,6 +10,19 @@ public class PhoneUiDetectorTest {
         assertTrue(r.active);assertEquals("+48 501 234 567",r.display);
         assertFalse(r.diagnostic.contains("501 234 567"));
     }
+    @Test public void extractsContactNameOnlyFromActiveCallWindow() {
+        PhoneUiDetector.Result active=PhoneUiDetector.detect("com.syu.bt",
+                Arrays.asList("Jan Kowalski","+48 501 234 567","00:31","End call"));
+        assertTrue(active.active);
+        assertEquals("Jan Kowalski",active.callerName);
+        assertEquals("+48 501 234 567",active.display);
+        assertFalse(active.diagnostic.contains("Jan Kowalski"));
+        PhoneUiDetector.Result idle=PhoneUiDetector.detect("com.syu.bt",
+                Arrays.asList("Jan Kowalski","+48 501 234 567"));
+        assertFalse(idle.active);
+        assertEquals("",idle.callerName);
+    }
+
     @Test public void numberPriorityAcrossCallObservers() {
         assertEquals("+48 501 234 567", PhoneUiDetector.firstNumber(
                 "ROZMOWA", "Polaczenie", "Telefon: +48 501 234 567"));
