@@ -83,6 +83,10 @@ final class QfOemBluetoothProbe {
         sample();
     }
 
+    boolean phoneConnected() {
+        return "true".equalsIgnoreCase(propertyStatus);
+    }
+
     void stop() {
         if (registered) {
             try { context.unregisterReceiver(receiver); }
