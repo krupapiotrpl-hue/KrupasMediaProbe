@@ -25,6 +25,27 @@ final class PhoneUiDetector {
         return "";
     }
 
+    // A contact name can be read from the *confirmed call UI* without contacts permission.
+    // Never treat arbitrary text, buttons or status bar labels as caller names.
+    static String firstName(String... labels) {
+        if(labels==null)return "";
+        for(String raw:labels) {
+            if(raw==null)continue;
+            String s=raw.trim().replaceAll("\\s+"," ");
+            if(s.length()<2 || s.length()>56 || firstNumber(s).length()>0)continue;
+            if(!s.matches(".*[\\p{L}].*") || s.matches(".*[0-9].*") ||
+                    s.indexOf('/')>=0 || s.indexOf('_')>=0 || s.indexOf(':')>=0)continue;
+            String lower=s.toLowerCase(Locale.ROOT);
+            if(lower.matches(".*(call|phone|dial|hang|answer|reject|accept|disconnect|end call|calling|incoming|outgoing|ringing|"
+                    +"rozmow|połącz|polacz|telefon|odbierz|odrzu|rozłącz|rozlacz|zakończ|zakoncz|"
+                    +"wybier|dzwoni|przychodz|przychodź|kontakt|contacts|call history|systemui|"
+                    +"bluetooth|mikrofon|microphone|speaker|głośn|glosn|mute|keypad|"
+                    +"notific|powiadom|settings|ustawieni|czas trwania).*"))continue;
+            return s;
+        }
+        return "";
+    }
+
     static boolean isCandidate(String pkg) {
         if(pkg==null)return false;
         String p=pkg.toLowerCase(Locale.ROOT);
@@ -68,6 +89,7 @@ final class PhoneUiDetector {
             if(s.matches("[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?"))timer=true;
             if (number.isEmpty()) number = firstNumber(s);
         }
+        String contactName=firstName(labels==null?null:labels.toArray(new String[0]));
         boolean active=!ended&&(end||(accept&&reject));
         // The K706 vendor phone package is not fixed across ROM releases.
         // Unknown packages need strong call-window evidence to avoid false positives.
@@ -87,7 +109,8 @@ final class PhoneUiDetector {
                 " / odbierz="+accept+" / odrzuc="+reject+" / czas="+timer+
                 " / numer="+(!number.isEmpty())+" / wybiera="+outgoing+
                 " / panel="+floatingPhonePanel+" / koniec="+ended;
-        return new Result(active,active?(number.isEmpty()?"ROZMOWA":number):"",diagnostic,pkg,
+        return new Result(active,active?(number.isEmpty()?
+                        (contactName.isEmpty()?"ROZMOWA":contactName):number):"",diagnostic,pkg,
                 (knownPhonePackage || active) ? number : "",
                 (knownPhonePackage && !"com.android.systemui".equalsIgnoreCase(pkg)) || active,ended);
     }
