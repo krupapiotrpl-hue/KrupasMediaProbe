@@ -29,7 +29,12 @@ final class QfOemBluetoothProbe {
     private static final String VENDOR_PACKAGE = "com.qf.bluetooth";
     private static final String MUSIC_INFO = "com.qf.action.BT.MUSIC.INFO";
     private static final String[] OTHER_READ_ONLY = {
-            "BT_STATE", "UPDATE_MEDIA_INFO", "UPDATE_MEDIA_STATE"
+            "com.qf.action.BT_STATE",
+            "com.qf.action.UPDATE_MEDIA_INFO",
+            "com.qf.action.UPDATE_MEDIA_STATE",
+            "com.qf.action.BT_MUSIC_INFO",
+            "com.qf.bluetooth.action.MUSIC_INFO",
+            "com.qf.musicplayer.action.UPDATE_ACTION"
     };
 
     private final Context context;
