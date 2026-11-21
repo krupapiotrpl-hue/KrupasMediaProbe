@@ -22,6 +22,46 @@ public class MediaProbeNotificationService extends NotificationListenerService {
     }
     @Override public void onDestroy() { if(connected==this)connected=null;super.onDestroy(); }
 
+    static final class CallSnapshot {
+        final boolean active;
+        final String display, pkg;
+        final boolean hasNumber;
+        CallSnapshot(boolean active,String display,String pkg,boolean hasNumber) {
+            this.active=active; this.display=display; this.pkg=pkg; this.hasNumber=hasNumber;
+        }
+    }
+
+    // Listen to Android/OEM/VoIP active call notifications without interfering with HFP.
+    // A Bluetooth-connected state or normal music notification is not a call.
+    static CallSnapshot activeCall(android.content.Context context) {
+        MediaProbeNotificationService svc=connected;
+        if(svc==null)return new CallSnapshot(false,"","",false);
+        try {
+            StatusBarNotification[] active=svc.getActiveNotifications();
+            if(active==null)return new CallSnapshot(false,"","",false);
+            CallSnapshot best=new CallSnapshot(false,"","",false);
+            for(StatusBarNotification item:active) {
+                if(item==null || item.getNotification()==null ||
+                        context.getPackageName().equals(item.getPackageName()))continue;
+                Notification n=item.getNotification();
+                String title=text(n.extras,Notification.EXTRA_TITLE);
+                String body=text(n.extras,Notification.EXTRA_TEXT);
+                String sub=text(n.extras,Notification.EXTRA_SUB_TEXT);
+                if(!CallNotificationPolicy.qualifies(n.category,item.isOngoing(),
+                        n.fullScreenIntent!=null,title,body))continue;
+                String label=CallNotificationPolicy.display(title,body,sub);
+                boolean number=!PhoneUiDetector.firstNumber(label).isEmpty();
+                CallSnapshot candidate=new CallSnapshot(true,label,item.getPackageName(),number);
+                if(!best.active || (number&&!best.hasNumber))best=candidate;
+            }
+            return best;
+        }catch(Exception e) {
+            context.getSharedPreferences("krupas_diag",0).edit()
+                    .putString("call_notification_error",e.getClass().getSimpleName()).apply();
+            return new CallSnapshot(false,"","",false);
+        }
+    }
+
     static MediaBridgeService.MediaResult activeRadio(android.content.Context context) {
         MediaBridgeService.MediaResult out=new MediaBridgeService.MediaResult();
         MediaProbeNotificationService service=connected;
