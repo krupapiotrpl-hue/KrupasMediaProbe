@@ -67,6 +67,9 @@ final class PhoneCallMonitor {
                               state==TelephonyManager.CALL_STATE_OFFHOOK);
     }
     long endedAt(){return endedAt;}
+    boolean isRinging() {
+        return authorized && state == TelephonyManager.CALL_STATE_RINGING;
+    }
 
     String status() {
         if(!authorized)return "BRAK UPRAWNIEN";
