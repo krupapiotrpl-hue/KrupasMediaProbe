@@ -37,6 +37,23 @@ public class CallDisplayPolicyTest {
         assertEquals("TEST TELEFONU",CallDisplayPolicy.display(CallDisplayPolicy.CONNECTED,number,true));
     }
 
+    @Test public void confirmedNameWinsOverNumberWithoutChangingCallPhases() {
+        String number="+48 501 234 567";
+        String name="Anna Kowalska";
+        assertEquals("WYBIERANIE",CallDisplayPolicy.display(
+                CallDisplayPolicy.DIALING,number,name,false));
+        assertEquals("POŁĄCZENIE",CallDisplayPolicy.display(
+                CallDisplayPolicy.RINGING,number,name,false));
+        assertEquals(name,CallDisplayPolicy.display(
+                CallDisplayPolicy.CONNECTED,number,name,false));
+        assertEquals(number,CallDisplayPolicy.display(
+                CallDisplayPolicy.CONNECTED,number,"Bluetooth",false));
+        assertEquals("ROZMOWA",CallDisplayPolicy.display(
+                CallDisplayPolicy.CONNECTED,"","",false));
+        assertEquals("TEST TELEFONU",CallDisplayPolicy.display(
+                CallDisplayPolicy.CONNECTED,number,name,true));
+    }
+
     @Test public void strongHfpSignalWinsOverStaleOutgoingUi() {
         assertEquals(CallDisplayPolicy.CONNECTED,CallDisplayPolicy.select(true,
                 CallDisplayPolicy.CONNECTED,true,CallDisplayPolicy.DIALING,false,false,""));
