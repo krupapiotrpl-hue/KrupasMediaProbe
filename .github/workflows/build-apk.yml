@@ -1,7 +1,7 @@
-name: KRUPAS Media Pro 1.3.17 DIALING NUMBER
+name: KRUPAS Media Pro 1.3.18 PHONE STABILITY
 on:
   push:
-    branches: ['fix/kmp-1317-dialing-number-20261123']
+    branches: ['fix/kmp-1318-phone-stability-20261123']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,14 +25,14 @@ jobs:
         run: gradle -p source/KrupasMediaProbe testDebugUnitTest assembleDebug --no-daemon --console=plain --stacktrace
       - name: Verify test APK
         run: |
-          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.17-DIALING-NUMBER.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.17-DIALING-NUMBER.apk
-          sha256sum KRUPAS-Media-Pro-1.3.17-DIALING-NUMBER.apk > SHA256SUMS.txt
+          cp source/KrupasMediaProbe/app/build/outputs/apk/debug/app-debug.apk KRUPAS-Media-Pro-1.3.18-PHONE-STABILITY.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose KRUPAS-Media-Pro-1.3.18-PHONE-STABILITY.apk
+          sha256sum KRUPAS-Media-Pro-1.3.18-PHONE-STABILITY.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: KRUPAS-Media-Pro-1.3.17-DIALING-NUMBER
+          name: KRUPAS-Media-Pro-1.3.18-PHONE-STABILITY
           path: |
-            KRUPAS-Media-Pro-1.3.17-DIALING-NUMBER.apk
+            KRUPAS-Media-Pro-1.3.18-PHONE-STABILITY.apk
             SHA256SUMS.txt
             source/KrupasMediaProbe/firmware/Krupas_1_9x22_EMPTY_REFRESH/Krupas_1_9x22_EMPTY_REFRESH.ino
             source/KrupasMediaProbe/TEST_1.3.8_K706.md
