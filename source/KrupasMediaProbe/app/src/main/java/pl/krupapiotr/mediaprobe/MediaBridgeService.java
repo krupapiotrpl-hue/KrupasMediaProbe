@@ -45,6 +45,7 @@ public final class MediaBridgeService extends Service {
     private QfOemBluetoothProbe qfProbe;
     private CallAudioMonitor callAudio;
     private final CallStatusTracker callTracker = new CallStatusTracker();
+    private final CallIdentityCache callIdentity = new CallIdentityCache();
     private boolean phoneDisplayed;
     // ESP may still show the previous T| overlay after a BLE/service restart.
     private boolean phoneClearPending = true;
@@ -266,6 +267,9 @@ public final class MediaBridgeService extends Service {
                 " / "+callTracker.reason()+
                 (ongoingCall ? " / ostatnie potwierdzenie "+
                     elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":""));
+        // This call alone owns its cached identity. An actual end (including
+        // the tracker grace timeout) clears it before another call may start.
+        if(!ongoingCall) callIdentity.clear();
         if(ongoingCall)testPhoneUntil=0;
         boolean testCall=!ongoingCall && now<testPhoneUntil;
         // Phone overlays are emitted only on confirmed call evidence. ESP
@@ -292,10 +296,18 @@ public final class MediaBridgeService extends Service {
             String callerName=PhoneUiDetector.firstName(
                     freshUiName?phoneUi.getString("caller_name",""):"",
                     notificationCall.active?notificationCall.callerName:"");
-            String display=CallDisplayPolicy.display(phase,number,callerName,testCall);
+            // Identity is latched for THIS confirmed call, not just 4/6 seconds.
+            // A momentarily hidden OEM phone window must not erase the label.
+            // The cache never keeps caller data after the call ends.
+            CallIdentityCache.Snapshot identity = ongoingCall
+                    ? callIdentity.update(number, callerName)
+                    : CallIdentityCache.Snapshot.EMPTY;
+            String display=CallDisplayPolicy.display(phase,identity.number,identity.name,testCall);
             diag("call_phase",(testCall?"TEST":phase)+
-                    " / numer_dostepny="+(!number.isEmpty())+
-                    " / nazwa_dostepna="+(!callerName.isEmpty()));
+                    " / numer_dostepny="+(!identity.number.isEmpty())+
+                    " / nazwa_dostepna="+(!identity.name.isEmpty())+
+                    " / numer_utrzymany="+(identity.numberCached)+
+                    " / nazwa_utrzymana="+(identity.nameCached));
             diag("route",testCall?"TELEFON / TEST":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
             if(ble.ready()&&(!phoneDisplayed||!display.equals(lastPhoneText)||
