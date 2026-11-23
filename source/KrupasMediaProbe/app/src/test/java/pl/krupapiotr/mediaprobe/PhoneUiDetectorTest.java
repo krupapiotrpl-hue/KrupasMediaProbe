@@ -32,6 +32,24 @@ public class PhoneUiDetectorTest {
                 "ROZMOWA", "00:31", "Numer prywatny"));
     }
 
+    @Test public void outgoingOemCallWithoutAccessibleHangup() {
+        PhoneUiDetector.Result r=PhoneUiDetector.detect("com.qf.bluetooth",
+                Arrays.asList("Wybieranie: +48 501 234 567","Anna Kowalska"));
+        assertTrue(r.active);
+        assertEquals(CallDisplayPolicy.DIALING,r.phase);
+        assertEquals("+48 501 234 567",r.display);
+        assertEquals("Anna Kowalska",r.callerName);
+        assertFalse(r.diagnostic.contains("501 234 567"));
+        assertFalse(PhoneUiDetector.detect("com.android.dialer",
+                Arrays.asList("Wybieranie","Kontakty")).active);
+    }
+
+    @Test public void embeddedNumberWithoutFakeViewId() {
+        assertEquals("+48 501 234 567",
+                PhoneUiDetector.firstNumber("Wybieranie: +48 501 234 567"));
+        assertEquals("",PhoneUiDetector.firstNumber("com.qf.bluetooth:id/tel_501234567"));
+        assertEquals("",PhoneUiDetector.firstNumber("11:38"));
+    }
     @Test public void incomingWithoutNumber() {
         PhoneUiDetector.Result r=PhoneUiDetector.detect("com.tw.bt",
                 Arrays.asList("Incoming call","Answer call","Reject call"));
