@@ -59,14 +59,16 @@ final class CallDisplayPolicy {
 
     static String display(String phase, String confirmedNumber, String confirmedName, boolean test) {
         if (test) return "TEST TELEFONU";
-        if (DIALING.equals(phase)) return "WYBIERANIE";
-        if (RINGING.equals(phase)) return "POŁĄCZENIE";
-        // A name from the confirmed call window or call notification wins
-        // over the number. Never use an arbitrary accessibility label.
+        // Identity must be confirmed for THIS call. A verified UI/notification
+        // contact name wins over a verified HFP/UI telephone number.
         String name = PhoneUiDetector.firstName(confirmedName);
-        if (!name.isEmpty()) return name;
         String number = PhoneUiDetector.firstNumber(confirmedNumber);
-        return number.isEmpty() ? "ROZMOWA" : number;
+        String who = !name.isEmpty() ? name : number;
+        if (DIALING.equals(phase))
+            return who.isEmpty() ? "WYBIERANIE" : "WYBIERANIE " + who;
+        if (RINGING.equals(phase))
+            return who.isEmpty() ? "POŁĄCZENIE" : "POŁĄCZENIE " + who;
+        return who.isEmpty() ? "ROZMOWA" : who;
     }
 
     private static boolean valid(String phase) {
