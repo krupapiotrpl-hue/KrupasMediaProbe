@@ -27,22 +27,24 @@ public class CallDisplayPolicyTest {
                 CallDisplayPolicy.fromNotification("Anna","00:31",""));
     }
 
-    @Test public void numberIsShownOnlyAfterAnswer() {
+    @Test public void numberIsShownDuringDialingAndAfterAnswer() {
         String number="+48 501 234 567";
-        assertEquals("WYBIERANIE",CallDisplayPolicy.display(CallDisplayPolicy.DIALING,number,false));
-        assertEquals("POŁĄCZENIE",CallDisplayPolicy.display(CallDisplayPolicy.RINGING,number,false));
+        assertEquals("WYBIERANIE "+number,CallDisplayPolicy.display(CallDisplayPolicy.DIALING,number,false));
+        assertEquals("POŁĄCZENIE "+number,CallDisplayPolicy.display(CallDisplayPolicy.RINGING,number,false));
         assertEquals(number,CallDisplayPolicy.display(CallDisplayPolicy.CONNECTED,number,false));
+        assertEquals("WYBIERANIE",CallDisplayPolicy.display(CallDisplayPolicy.DIALING,"",false));
+        assertEquals("POŁĄCZENIE",CallDisplayPolicy.display(CallDisplayPolicy.RINGING,"",false));
         assertEquals("ROZMOWA",CallDisplayPolicy.display(CallDisplayPolicy.CONNECTED,"",false));
         assertEquals("ROZMOWA",CallDisplayPolicy.display(CallDisplayPolicy.CONNECTED,"Anna",false));
         assertEquals("TEST TELEFONU",CallDisplayPolicy.display(CallDisplayPolicy.CONNECTED,number,true));
     }
 
-    @Test public void confirmedNameWinsOverNumberWithoutChangingCallPhases() {
+    @Test public void confirmedNameWinsOverNumberIncludingDialingAndRinging() {
         String number="+48 501 234 567";
         String name="Anna Kowalska";
-        assertEquals("WYBIERANIE",CallDisplayPolicy.display(
+        assertEquals("WYBIERANIE "+name,CallDisplayPolicy.display(
                 CallDisplayPolicy.DIALING,number,name,false));
-        assertEquals("POŁĄCZENIE",CallDisplayPolicy.display(
+        assertEquals("POŁĄCZENIE "+name,CallDisplayPolicy.display(
                 CallDisplayPolicy.RINGING,number,name,false));
         assertEquals(name,CallDisplayPolicy.display(
                 CallDisplayPolicy.CONNECTED,number,name,false));
