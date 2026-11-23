@@ -10,8 +10,8 @@ android {
         applicationId 'pl.krupapiotr.mediaprobe'
         minSdk 23
         targetSdk 32
-        versionCode 1318
-        versionName '1.3.17-DIALING-NUMBER'
+        versionCode 1319
+        versionName '1.3.18-PHONE-STABILITY'
     }
 
     buildTypes {
