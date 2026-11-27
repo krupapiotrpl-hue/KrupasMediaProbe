@@ -26,12 +26,12 @@ public class CallIdentityCacheTest {
                 CallDisplayPolicy.CONNECTED,cache.update("","").number,"",false));
     }
 
-    @Test public void newCallerNumberDropsPreviousName() {
+    @Test public void unrelatedNumberDoesNotReplaceConfirmedCaller() {
         CallIdentityCache cache = new CallIdentityCache();
         cache.update("501234567","Córka");
         CallIdentityCache.Snapshot second=cache.update("555222111","");
-        assertEquals("555222111",second.number);
-        assertEquals("",second.name);
+        assertEquals("501234567",second.number);
+        assertEquals("Córka",second.name);
     }
 
     @Test public void newNameOverridesSavedNumberOnDisplay() {

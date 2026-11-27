@@ -266,7 +266,8 @@ public final class MediaBridgeService extends Service {
                 " / BLE="+ble.ready()+
                 " / "+callTracker.reason()+
                 (ongoingCall ? " / ostatnie potwierdzenie "+
-                    elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":""));
+                    elapsedReadable(now-callTracker.lastEvidenceAt())+" temu":"")+
+                " / ostatnie zakonczenie: "+callTracker.lastEnd());
         // This call alone owns its cached identity. An actual end (including
         // the tracker grace timeout) clears it before another call may start.
         if(!ongoingCall) callIdentity.clear();
@@ -283,8 +284,9 @@ public final class MediaBridgeService extends Service {
             String number=PhoneUiDetector.firstNumber(
                     hfpActive?hfp.display():"",
                     uiCall?phoneUi.getString("display",""):"",
-                    callerEvidence?phoneUi.getString("caller_hint",""):"",
-                    notificationCall.active?notificationCall.display:"");
+                    notificationCall.active?notificationCall.display:"",
+                    callerEvidence && hintSeen >= callTracker.beganAt()-4000L
+                        ? phoneUi.getString("caller_hint",""):"");
             // Never show a number during ringing/dialing, and never reuse
             // a number from an earlier call as the new caller's identity.
             // A fresh name from the confirmed OEM call window or active call
@@ -311,10 +313,11 @@ public final class MediaBridgeService extends Service {
             diag("route",testCall?"TELEFON / TEST":
                     "TELEFON / "+(callConfirmed?evidence:"PODTRZYMANIE"));
             if(ble.ready()&&(!phoneDisplayed||!display.equals(lastPhoneText)||
-                    now-lastPhoneSent>=10000)){
+                    now-lastPhoneSent>=3000)){
                 ble.send("PHONE:"+display);
                 lastPhoneText=display;
                 phoneDisplayed=true;
+                phoneClearPending=false;
                 lastPhoneSent=now;
             }
             return;

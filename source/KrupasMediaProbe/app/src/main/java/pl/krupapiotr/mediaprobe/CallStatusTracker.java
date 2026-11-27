@@ -8,12 +8,13 @@ package pl.krupapiotr.mediaprobe;
  * All timestamps are wall-clock milliseconds, consistent with call observers.
  */
 final class CallStatusTracker {
-    static final long EVIDENCE_GRACE_MS = 12_000L;
+    static final long EVIDENCE_GRACE_MS = 30L * 60L * 1000L;
 
     private boolean active;
     private long began;
     private long lastEvidence;
     private boolean waitForEvidenceToDrop;
+    private String lastEnd = "BRAK";
     private String reason = "BRAK POTWIERDZONEJ ROZMOWY";
 
     boolean update(long now, boolean confirmed, long endAt) {
@@ -22,6 +23,7 @@ final class CallStatusTracker {
             active = false;
             waitForEvidenceToDrop = confirmed;
             reason = "POTWIERDZONE ROZLACZENIE";
+            lastEnd = reason + " / UTC_MS=" + now;
             return false;
         }
         // An old positive event may remain cached for several seconds after
@@ -40,7 +42,8 @@ final class CallStatusTracker {
             final long missingMs = Math.max(0L, now - lastEvidence);
             if (missingMs >= EVIDENCE_GRACE_MS) {
                 active = false;
-                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ 12 S";
+                reason = "WYGASZONO - LIMIT AWARYJNY 30 MIN";
+                lastEnd = reason + " / UTC_MS=" + now;
             } else {
                 reason = "PODTRZYMANIE - BRAK NOWEGO SYGNALU";
             }
@@ -51,5 +54,7 @@ final class CallStatusTracker {
     }
 
     String reason() { return reason; }
+    String lastEnd() { return lastEnd; }
+    long beganAt() { return began; }
     long lastEvidenceAt() { return lastEvidence; }
 }

@@ -32,8 +32,13 @@ final class CallIdentityCache {
         boolean nameCached = label.isEmpty() && !name.isEmpty();
         if (!n.isEmpty()) {
             // Do not keep a name belonging to a different phone number.
-            if (!number.isEmpty() && !sameNumber(number, n)) name = "";
-            number = n;
+            if (number.isEmpty()) number = n;
+            else if (sameNumber(number, n)) {
+                if (n.startsWith("+") && !number.startsWith("+")) number = n;
+            } else {
+                // A transient unrelated number must not replace a confirmed caller.
+                label = "";
+            }
         }
         if (!label.isEmpty()) name = label;
         return new Snapshot(number, name, numberCached, nameCached && !name.isEmpty());
@@ -45,6 +50,12 @@ final class CallIdentityCache {
     }
 
     private static boolean sameNumber(String a, String b) {
-        return a.replaceAll("[^0-9]", "").equals(b.replaceAll("[^0-9]", ""));
+        String x = a.replaceAll("[^0-9]", "");
+        String y = b.replaceAll("[^0-9]", "");
+        if (x.startsWith("0048")) x = x.substring(2);
+        if (y.startsWith("0048")) y = y.substring(2);
+        if (x.length() == 11 && x.startsWith("48")) x = x.substring(2);
+        if (y.length() == 11 && y.startsWith("48")) y = y.substring(2);
+        return x.equals(y);
     }
 }

@@ -349,14 +349,15 @@ public final class RadioAccessibilityService extends AccessibilityService {
                     edit.remove("caller_name").remove("caller_name_seen");
                 }
             }else {
-                edit.remove("display").remove("caller_name").remove("caller_name_seen");
+                // Retain the last confirmed identity for its short positive-evidence window.
+                // The bridge owns the per-call cache; explicit end clears UI identity.
+                if(detected.ended) edit.remove("display").remove("caller_name").remove("caller_name_seen");
             }
             if(detected.ended)edit.putLong("ended_seen",System.currentTimeMillis());
             edit.apply();
         } else {
             getSharedPreferences("krupas_phone_ui",MODE_PRIVATE).edit()
-                    .putBoolean("active",false).remove("display").remove("phase")
-                    .remove("caller_name").remove("caller_name_seen")
+                    .putBoolean("active",false)
                     .putString("status","BRAK OKNA ROZMOWY / okna="+inspectedWindows+
                             " / pakiety="+seenPackages.toString().trim())
                     .putLong("seen",System.currentTimeMillis()).apply();

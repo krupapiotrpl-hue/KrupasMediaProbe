@@ -22,10 +22,11 @@ public class CallStatusTrackerTest {
     @Test public void staleCallClearsEvenIfNoOemHangupBroadcastArrives() {
         CallStatusTracker c = new CallStatusTracker();
         assertTrue(c.update(1000, true, 0));
-        assertTrue(c.update(12999, false, 0));
-        assertFalse(c.update(13000, false, 0));
+        assertTrue(c.update(21000, false, 0));
+        assertTrue(c.update(1000 + CallStatusTracker.EVIDENCE_GRACE_MS - 1, false, 0));
+        assertFalse(c.update(1000 + CallStatusTracker.EVIDENCE_GRACE_MS, false, 0));
         assertTrue(c.reason().contains("WYGASZONO"));
-        assertFalse(c.update(800000, false, 0));
+        assertFalse(c.update(2000000, false, 0));
     }
 
     @Test public void freshSignalRestartsGracePeriod() {
@@ -33,9 +34,9 @@ public class CallStatusTrackerTest {
         assertTrue(c.update(1000, true, 0));
         assertTrue(c.update(5000, false, 0));
         assertTrue(c.update(6000, true, 0));
-        assertTrue(c.update(17999, false, 0));
-        assertFalse(c.update(18000, false, 0));
-        assertTrue(c.update(18500, true, 0));
+        assertTrue(c.update(6000 + CallStatusTracker.EVIDENCE_GRACE_MS - 1, false, 0));
+        assertFalse(c.update(6000 + CallStatusTracker.EVIDENCE_GRACE_MS, false, 0));
+        assertTrue(c.update(6001 + CallStatusTracker.EVIDENCE_GRACE_MS, true, 0));
     }
 
     @Test public void explicitHangupWinsOverCachedPositiveSignal() {
