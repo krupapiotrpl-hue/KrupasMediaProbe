@@ -27,10 +27,8 @@ public final class MainActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setPadding(24,12,24,12);root.setOrientation(LinearLayout.VERTICAL);
         TextView heading=new TextView(this);heading.setText("KRUPAS MEDIA PRO " + getAppVersion() + " • K706");
         heading.setTextSize(24);heading.setTypeface(Typeface.DEFAULT_BOLD);root.addView(heading);
-        TextView hint=new TextView(this);hint.setText("FM / MP3 / DAB-Z: powiadomienia. DAB+: przygotowany protokół DAB dla przyszłego firmware ESP.");
-        hint.setTextSize(18);root.addView(hint);
         CheckBox dabNative=new CheckBox(this);
-        dabNative.setText("DAB+ D| (włącz dopiero po aktualizacji ESP; teraz M|)");
+        dabNative.setText("DAB+: osobny protokół D| (wyłączony: M|)");
         dabNative.setTextSize(16);
         dabNative.setChecked(getSharedPreferences("krupas_settings",0)
                 .getBoolean("dab_native_protocol",false));
@@ -52,7 +50,7 @@ public final class MainActivity extends Activity {
         addButton(buttons,"Test FM",()->startBridge(MediaBridgeService.ACTION_TEST_FM));
         addButton(buttons,"Test MP3",()->startBridge(MediaBridgeService.ACTION_TEST_MP3));
         addButton(buttons,"Test telefonu",()->startBridge(MediaBridgeService.ACTION_TEST_PHONE));
-        addButton(buttons,"Kopiuj",()->{
+        addButton(buttons,"Kopiuj diagnostykę",()->{
             android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
             if(clipboard!=null && status!=null)clipboard.setPrimaryClip(android.content.ClipData.newPlainText("KRUPAS diagnostyka",status.getText()));
             android.widget.Toast.makeText(this,"Skopiowano diagnostykę",android.widget.Toast.LENGTH_SHORT).show();
