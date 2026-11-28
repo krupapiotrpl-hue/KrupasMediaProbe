@@ -253,7 +253,12 @@ public final class MediaBridgeService extends Service {
         // End signals are explicit: HFP TERMINATED, telephony IDLE transition or UI ended.
         long endAt = Math.max(phoneUi.getLong("ended_seen",0),
                 Math.max(hfp==null?0:hfp.endedAt(),phone==null?0:phone.endedAt()));
-        boolean ongoingCall = callTracker.update(now,callConfirmed,endAt);
+        String observedPhase=CallDisplayPolicy.select(
+                hfpActive, hfpActive?hfp.phase():"",
+                uiCall, uiCall?phoneUi.getString("phase",""):"",
+                phone!=null&&phone.isRinging(),
+                notificationCall.active,notificationCall.phase);
+        boolean ongoingCall = callTracker.update(now,callConfirmed,endAt,observedPhase);
         String evidence = hfpActive ? "HFP" : localCall ? "TELEFONIA" :
                 uiCall ? "OKNO ROZMOWY" : audioCandidate ? "AUDIO BT" :
                 callerEvidence ? "OKNO BT + NUMER" :
@@ -275,18 +280,13 @@ public final class MediaBridgeService extends Service {
         // Phone overlays are emitted only on confirmed call evidence. ESP
         // renders the existing T| marker from a PHONE: payload.
         if(ongoingCall||testCall){
-            String phase=CallDisplayPolicy.select(
-                    hfpActive, hfpActive?hfp.phase():"",
-                    uiCall, uiCall?phoneUi.getString("phase",""):"",
-                    phone!=null&&phone.isRinging(),
-                    notificationCall.active,notificationCall.phase);
+            String phase=callTracker.phase();
             String number=PhoneUiDetector.firstNumber(
                     hfpActive?hfp.display():"",
                     uiCall?phoneUi.getString("display",""):"",
                     callerEvidence?phoneUi.getString("caller_hint",""):"",
                     notificationCall.active?notificationCall.display:"");
-            // Never show a number during ringing/dialing, and never reuse
-            // a number from an earlier call as the new caller's identity.
+            // Never reuse a number from an earlier call as the new caller's identity.
             // A fresh name from the confirmed OEM call window or active call
             // notification takes precedence over the number. No contacts
             // permission or phonebook syncing is required for this path.
