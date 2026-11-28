@@ -53,6 +53,30 @@ public class CallStatusTrackerTest {
         assertTrue(c.update(51000, true, 10000));
     }
 
+    @Test public void dialingSurvivesMissingUiButExpiresAtFiniteLimit() {
+        CallStatusTracker c = new CallStatusTracker();
+        assertTrue(c.update(1000, true, 0, CallDisplayPolicy.DIALING));
+        assertTrue(c.update(21000, false, 0, CallDisplayPolicy.CONNECTED));
+        assertEquals(CallDisplayPolicy.DIALING, c.phase());
+        assertTrue(c.update(40999, false, 0, CallDisplayPolicy.CONNECTED));
+        assertFalse(c.update(41000, false, 0, CallDisplayPolicy.CONNECTED));
+    }
+
+    @Test public void ringingEndsImmediatelyOnExplicitHangup() {
+        CallStatusTracker c = new CallStatusTracker();
+        assertTrue(c.update(1000, true, 0, CallDisplayPolicy.RINGING));
+        assertFalse(c.update(2000, true, 2000, CallDisplayPolicy.RINGING));
+        assertFalse(c.update(3000, true, 2000, CallDisplayPolicy.RINGING));
+    }
+
+    @Test public void connectedCallRetainsOriginalTwelveSecondLimit() {
+        CallStatusTracker c = new CallStatusTracker();
+        assertTrue(c.update(1000, true, 0, CallDisplayPolicy.DIALING));
+        assertTrue(c.update(5000, true, 0, CallDisplayPolicy.CONNECTED));
+        assertTrue(c.update(16999, false, 0, CallDisplayPolicy.CONNECTED));
+        assertFalse(c.update(17000, false, 0, CallDisplayPolicy.CONNECTED));
+    }
+
     @Test public void staleHangupCannotEndNextCall() {
         CallStatusTracker c = new CallStatusTracker();
         assertTrue(c.update(1000, true, 0));
