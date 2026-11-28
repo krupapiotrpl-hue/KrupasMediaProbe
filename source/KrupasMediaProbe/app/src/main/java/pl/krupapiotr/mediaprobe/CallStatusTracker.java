@@ -9,6 +9,8 @@ package pl.krupapiotr.mediaprobe;
  */
 final class CallStatusTracker {
     static final long EVIDENCE_GRACE_MS = 12_000L;
+    static final long RINGING_GRACE_MS = 40_000L;
+    private String phase = CallDisplayPolicy.CONNECTED;
 
     private boolean active;
     private long began;
@@ -17,6 +19,10 @@ final class CallStatusTracker {
     private String reason = "BRAK POTWIERDZONEJ ROZMOWY";
 
     boolean update(long now, boolean confirmed, long endAt) {
+        return update(now, confirmed, endAt, CallDisplayPolicy.CONNECTED);
+    }
+
+    boolean update(long now, boolean confirmed, long endAt, String observedPhase) {
         // End events beat cached positive UI samples for the previous call.
         if (active && endAt > began && endAt <= now) {
             active = false;
@@ -34,13 +40,16 @@ final class CallStatusTracker {
         if (confirmed) {
             if (!active) began = now;
             active = true;
+            phase = observedPhase;
             lastEvidence = now;
             reason = "ROZMOWA POTWIERDZONA";
         } else if (active) {
             final long missingMs = Math.max(0L, now - lastEvidence);
-            if (missingMs >= EVIDENCE_GRACE_MS) {
+            final long grace = CallDisplayPolicy.DIALING.equals(phase) || CallDisplayPolicy.RINGING.equals(phase)
+                    ? RINGING_GRACE_MS : EVIDENCE_GRACE_MS;
+            if (missingMs >= grace) {
                 active = false;
-                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ 12 S";
+                reason = "WYGASZONO - BRAK POTWIERDZENIA PRZEZ " + (grace / 1000) + " S";
             } else {
                 reason = "PODTRZYMANIE - BRAK NOWEGO SYGNALU";
             }
@@ -50,6 +59,7 @@ final class CallStatusTracker {
         return active;
     }
 
+    String phase() { return active ? phase : CallDisplayPolicy.CONNECTED; }
     String reason() { return reason; }
     long lastEvidenceAt() { return lastEvidence; }
 }
