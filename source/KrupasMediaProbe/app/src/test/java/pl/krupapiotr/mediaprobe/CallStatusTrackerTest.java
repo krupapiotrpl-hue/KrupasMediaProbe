@@ -77,6 +77,30 @@ public class CallStatusTrackerTest {
         assertFalse(c.update(17000, false, 0, CallDisplayPolicy.CONNECTED));
     }
 
+    @Test public void audioRecoveryClearsBeforeRingingTimeout() {
+        CallStatusTracker c = new CallStatusTracker();
+        assertTrue(c.update(1000, true, 0, CallDisplayPolicy.DIALING, true, false));
+        assertTrue(c.update(3000, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+        assertTrue(c.update(5999, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+        assertFalse(c.update(6000, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+    }
+
+    @Test public void playingMediaAloneNeverEndsCall() {
+        CallStatusTracker c = new CallStatusTracker();
+        assertTrue(c.update(1000, true, 0, CallDisplayPolicy.DIALING, false, false));
+        assertTrue(c.update(3000, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+        assertTrue(c.update(6000, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+    }
+
+    @Test public void renewedCallEvidenceCancelsAudioRecovery() {
+        CallStatusTracker c = new CallStatusTracker();
+        assertTrue(c.update(1000, true, 0, CallDisplayPolicy.DIALING, true, false));
+        assertTrue(c.update(3000, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+        assertTrue(c.update(6000, true, 0, CallDisplayPolicy.CONNECTED, false, true));
+        assertTrue(c.update(7000, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+        assertTrue(c.update(9999, false, 0, CallDisplayPolicy.CONNECTED, false, true));
+    }
+
     @Test public void staleHangupCannotEndNextCall() {
         CallStatusTracker c = new CallStatusTracker();
         assertTrue(c.update(1000, true, 0));
