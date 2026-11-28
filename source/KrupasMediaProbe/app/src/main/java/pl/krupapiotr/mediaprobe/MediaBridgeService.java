@@ -258,7 +258,12 @@ public final class MediaBridgeService extends Service {
                 uiCall, uiCall?phoneUi.getString("phase",""):"",
                 phone!=null&&phone.isRinging(),
                 notificationCall.active,notificationCall.phase);
-        boolean ongoingCall = callTracker.update(now,callConfirmed,endAt,observedPhase);
+        boolean voiceAudio = audioCandidate && audio != null && audio.error.isEmpty() &&
+                (audio.mode == 2 || audio.mode == 3) && (audio.mode == 2 || audio.sco || audio.voicePlayback);
+        boolean normalAudioWithPlayingMedia = audio != null && audio.error.isEmpty() &&
+                audio.mode == 0 && !audio.sco && !audio.voicePlayback && "PLAYING".equals(media.state);
+        boolean ongoingCall = callTracker.update(now,callConfirmed,endAt,observedPhase,
+                voiceAudio,normalAudioWithPlayingMedia);
         String evidence = hfpActive ? "HFP" : localCall ? "TELEFONIA" :
                 uiCall ? "OKNO ROZMOWY" : audioCandidate ? "AUDIO BT" :
                 callerEvidence ? "OKNO BT + NUMER" :
